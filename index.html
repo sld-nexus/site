@@ -3,7 +3,7 @@
 <head>
     <script>
         // 앱 표시 및 리소스 캐시 공통 버전
-        window.APP_VERSION = "sld-nexus-v1";
+        window.APP_VERSION = "sld-nexus-V1";
         window.NEXUS_BUILD_VERSION = window.APP_VERSION;
         if (new URLSearchParams(window.location.search).get('nexusStandalone') === 'build') {
             document.documentElement.classList.add('nexus-standalone-build');
@@ -200,11 +200,11 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
-    <meta property="og:image" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-v1">
-    <meta property="og:image:secure_url" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-v1">
+    <meta property="og:image" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-V1">
+    <meta property="og:image:secure_url" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-V1">
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:alt" content="개복디 넥서스">
-    <meta name="twitter:image" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-v1">
+    <meta name="twitter:image" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-V1">
     <meta name="twitter:image:alt" content="개복디 넥서스">
     <meta name="description" content="유닛도감, 히든보드, 필요재료, 정수계산을 한곳에서 사용할 수 있는 개복디 넥서스 조합/계산 HUB">
     <meta property="og:type" content="website">
@@ -374,9 +374,6 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
         <nav class="gh-center" aria-label="주요 화면">
             <button type="button" id="btnViewUnitboard" class="gh-nav-btn active" data-action="switchMainView" data-view="unitboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="gh-nav-label">유닛도감</span></button>
             <button type="button" id="btnViewHiddenboard" class="gh-nav-btn" data-action="switchMainView" data-view="hiddenboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v5m-7 5V8h14v5M5 17v4m14-4v4"/><rect x="2" y="13" width="6" height="4" rx="1"/><rect x="16" y="13" width="6" height="4" rx="1"/><rect x="9" y="3" width="6" height="5" rx="1"/></svg><span class="gh-nav-label">히든보드</span></button>
-
-            <template id="invenboardNavTemplate"><button type="button" id="btnViewInvenboard" class="gh-nav-btn" data-action="switchMainView" data-view="invenboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/></svg><span class="gh-nav-label">재료보드</span></button></template>
-            <template id="genealogyNavTemplate"><button type="button" id="btnViewGenealogy" class="gh-nav-btn" data-action="switchMainView" data-view="genealogy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v4M5 16v-5h14v5"/><rect x="8" y="2" width="8" height="5" rx="1"/><rect x="2" y="16" width="6" height="5" rx="1"/><rect x="16" y="16" width="6" height="5" rx="1"/></svg><span class="gh-nav-label">유닛족보</span></button></template>
         </nav>
         <div class="gh-right">
             <button type="button" id="btnBuildStandalone" class="gh-tool-btn" data-action="openBuildIndependentWindow" aria-label="조합·재료 독립 창" title="조합·재료 독립 창"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4" width="19" height="15" rx="2"/><rect x="11.5" y="11" width="7.5" height="5.5" rx="1"/></svg></button>
@@ -424,42 +421,6 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
             <div class="panel-header hiddenboard-ph" id="boardMobileHeader"><div class="hiddenboard-ph-btns" id="hiddenboardGlobalActions"><button type="button" id="btnHideCompleted" class="ctrl-btn" data-action="toggleHideCompleted" aria-pressed="false" title="완료된 재료를 표시하고 있습니다"><span id="btnHideCompletedLabel">완료 숨기기</span><span class="action-state" id="btnHideCompletedState" aria-hidden="true">OFF</span></button><button type="button" id="btnRestoreAll" class="ctrl-btn reset-btn" data-action="restoreAllCompleted" title="전체 선택·보류·완료 내역 초기화 · 2초 내 다시 누르면 취소"><span id="btnRestoreAllLabel" aria-live="polite">전체 초기화</span><span class="reset-action-state" id="btnRestoreAllState" aria-hidden="true">↺</span></button></div></div>
             <div id="boardContent" class="panel-body"></div>
         </section>
-        <template id="genealogyPanelTemplate"><section id="genealogyPanel" class="genealogy-panel" hidden aria-label="유닛 족보">
-            <aside class="genealogy-sidebar" aria-label="최종 목표 목록">
-                <div class="genealogy-sidebar-controls">
-                    <div class="genealogy-sidebar-heading"><h2>최종 목표</h2><span id="genealogyTargetCount">31종</span></div>
-                    <div class="genealogy-grade-filters" role="group" aria-label="등급별 최종 목표 필터">
-                        <button type="button" data-genealogy-grade="all" aria-pressed="true">전체</button>
-                        <button type="button" data-genealogy-grade="슈퍼히든" aria-pressed="false">슈퍼</button>
-                        <button type="button" data-genealogy-grade="고유히든" aria-pressed="false">고유</button>
-                        <button type="button" data-genealogy-grade="히든" aria-pressed="false">히든</button>
-                    </div>
-                </div>
-                <div id="genealogyTargetList" class="genealogy-target-list" role="group" aria-label="최종 목표 31종"></div>
-            </aside>
-            <section class="genealogy-detail" aria-label="선택 유닛 정보">
-                <div class="genealogy-detail-heading"><h2>유닛 정보</h2></div>
-                <div id="genealogyDetailScroll" class="genealogy-detail-scroll">
-                    <div id="genealogyInfo" class="genealogy-info"></div>
-                </div>
-            </section>
-            <div class="genealogy-content">
-                <div class="genealogy-toolbar" aria-label="유닛 족보 및 트리 탐색 도구">
-                    <h2 class="genealogy-toolbar-title">유닛 족보</h2>
-                    <div class="genealogy-toolbar-buttons" role="group" aria-label="트리 펼침 및 이동">
-                        <button type="button" id="genealogyExpandAll">전체 펼치기</button>
-                        <button type="button" id="genealogyCollapseAll">전체 접기</button>
-                        <button type="button" id="genealogyGoBase">기초 재료 ↓</button>
-                        <button type="button" id="genealogyGoGoal">최종 목표 ↑</button>
-                    </div>
-                </div>
-                <div class="genealogy-workspace">
-                    <div id="genealogyScroll" class="genealogy-scroll" tabindex="0" aria-label="최종 목표부터 기초 재료까지의 계층형 유닛 족보">
-                        <div id="genealogyGraph" class="genealogy-graph"></div>
-                    </div>
-                </div>
-            </div>
-        </section></template>
     </main>
     <div id="boardActionStatus" class="action-feedback" role="status" aria-live="polite" aria-atomic="true"></div>
     <div id="recipeTooltip" class="recipe-tooltip" role="tooltip" aria-live="polite"></div>
