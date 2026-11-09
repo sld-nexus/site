@@ -1909,8 +1909,9 @@
             const gridId = tGrid?.id || '';
             _unitRestoreLevels.set(id, restoreLevelsByGridId[gridId] || 0);
             const keepCompletedVisible = excludeGridIds.includes(gridId);
-            const hideT = (_hideCompleted && isCompleted && !keepCompletedVisible) ||
-                (!!highlightDeps && !highlightDeps.has(id));
+            // 목표 추적 시 다른 유닛은 숨기지 않고 흐리게 표시합니다.
+            // 완료 숨기기는 별도 사용자 설정이므로 기존 동작을 유지합니다.
+            const hideT = _hideCompleted && isCompleted && !keepCompletedVisible;
             if (tGrid) {
                 if (!hideT) {
                     slotEl.classList.add('is-visible');
@@ -2864,6 +2865,9 @@
 
     document.addEventListener('click', e => {
         if (!e.target.closest('.gh-fontsize-ctrl')) closeFontSizePopup();
+        // 프리셋 메뉴 바깥을 클릭하거나 터치하면 열린 메뉴를 닫습니다.
+        const presetDisclosure = document.querySelector('.preset-disclosure[open]');
+        if (presetDisclosure && !presetDisclosure.contains(e.target)) presetDisclosure.open = false;
         const pointerCardUid = _smartChangePointerCardUid;
         _smartChangePointerCardUid = null;
         const card = e.target.closest('.unit-card[data-action="toggleUnit"]');
@@ -2975,6 +2979,11 @@
             return;
         }
         if (e.key === 'Escape') {
+            const presetDisclosure = document.querySelector('.preset-disclosure[open]');
+            if (presetDisclosure) {
+                presetDisclosure.open = false;
+                presetDisclosure.querySelector('summary')?.focus({ preventScroll: true });
+            }
             closeFontSizePopup(true);
             if (_currentHighlight) toggleHighlight(null);
             hideRecipeTooltip();
