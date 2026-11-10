@@ -3,7 +3,7 @@
 <head>
     <script>
         // 앱 표시 및 리소스 캐시 공통 버전
-        window.APP_VERSION = "sld-nexus-V1";
+        window.APP_VERSION = "sld-nexus-V38";
         window.NEXUS_BUILD_VERSION = window.APP_VERSION;
         if (new URLSearchParams(window.location.search).get('nexusStandalone') === 'build') {
             document.documentElement.classList.add('nexus-standalone-build');
@@ -200,22 +200,22 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
-    <meta property="og:image" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-V1">
-    <meta property="og:image:secure_url" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-V1">
+    <meta property="og:image" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-V38">
+    <meta property="og:image:secure_url" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-V38">
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:alt" content="개복디 넥서스">
-    <meta name="twitter:image" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-V1">
+    <meta name="twitter:image" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-V38">
     <meta name="twitter:image:alt" content="개복디 넥서스">
-    <meta name="description" content="유닛도감, 히든보드, 필요재료, 정수계산을 한곳에서 사용할 수 있는 개복디 넥서스 조합/계산 HUB">
+    <meta name="description" content="유닛도감과 히든보드, 나의 조합의 필요 재료와 정수계산을 제공하는 개복디 넥서스">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://sld-nexus.github.io/site/">
     <meta property="og:title" content="개복디 넥서스 - 히든조합&정수 계산 HUB">
-    <meta property="og:description" content="유닛도감, 히든보드, 필요재료, 정수계산을 한곳에서 사용할 수 있는 개복디 넥서스 조합/계산 HUB">
+    <meta property="og:description" content="유닛도감과 히든보드, 나의 조합의 필요 재료와 정수계산을 제공하는 개복디 넥서스">
     <meta property="og:image:width" content="1280">
     <meta property="og:image:height" content="630">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="개복디 넥서스 - 히든조합&정수 계산 HUB">
-    <meta name="twitter:description" content="유닛도감, 히든보드, 필요재료, 정수계산을 한곳에서 사용할 수 있는 개복디 넥서스 조합/계산 HUB">
+    <meta name="twitter:description" content="유닛도감과 히든보드, 나의 조합의 필요 재료와 정수계산을 제공하는 개복디 넥서스">
     <script>
         (function(){
             var icon = document.createElement('link');
@@ -231,7 +231,7 @@
             document.head.appendChild(stylesheet);
         })();
     </script>
-<script id="standaloneExperience">
+<script id="headerControlLabels">
 (function(){
 'use strict';
   function syncHeaderControlLayout(){
@@ -244,13 +244,7 @@
     var definitions=[
       ['[data-nexus-view="dps"]','개복디 빌더',window.innerWidth<768?32:34],
       ['#btnFontSizePopup','글씨 크기 조절',window.innerWidth<768?32:34],
-      ['.font-scale-trigger','글씨 크기 조절',30],
-      ['.header-nexus-link','히든조합 계산기 이동',window.innerWidth<600?30:35],
-      ['#dpsCompareOpen','전체 DPS표',35],
-      ['#independentWindowToggle','독립 창 선택',35],
-      ['#btnBuildStandalone','조합·재료 독립 창',window.innerWidth<768?32:34],
-      
-
+      ['#btnBuildStandalone','나의 조합 독립 창',window.innerWidth<768?32:34],
     ];
     definitions.forEach(function(definition){
       document.querySelectorAll(definition[0]).forEach(function(control){

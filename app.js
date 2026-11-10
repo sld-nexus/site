@@ -95,7 +95,6 @@
     // 자동 완료 그룹의 재료 판정은 사용자 수동 설정이 아닌 내부 규칙이다.
     const AUTO_COST_SLOT_RAWS = ['갓오타', '메시브', '자동포탑'];
     const AUTO_COST_SLOT_SET = new Set(AUTO_COST_SLOT_RAWS.map(clean));
-    const SPECIAL_RENDER_LIST = AUTO_COST_SLOT_RAWS.map(raw => ({ id: clean(raw), raw, batch: raw === '자동포탑' ? 5 : 1 }));
     const AUTO_RECIPE_REQUIREMENT_SET = new Set(['갓오타', '메시브'].map(clean));
     const AUTO_COST_RAW_MAP = Object.fromEntries(AUTO_COST_SLOT_RAWS.map(id => [clean(id), id]));
     // 이전 버전 저장 데이터의 재료 완료값을 정규화하기 위한 호환 목록.
@@ -113,9 +112,6 @@
     const isAutoRecipeRequirementSatisfied = (id) =>
         AUTO_RECIPE_REQUIREMENT_SET.has(id) ||
         (_currentViewMode === 'hiddenboard' && id === HELPER_ID);
-    // 이전 버전 재료 보드 보유량을 읽고 그대로 저장하기 위한 호환 목록이다.
-    const LEGACY_MATERIAL_SLOT_ID_SET = new Set([...SYSTEM_CONFIG.costboardAtoms.map(clean),
-        ...AUTO_COST_SLOT_SET, ...LEGACY_COMPLETION_ATOM_ID_SET, HELPER_ID, VOID_RAY_ID]);
     const COSTBOARD_COMPLETION_ID_SET = new Set([...SYSTEM_CONFIG.costboardAtoms.map(clean), ...AUTO_COST_SLOT_SET, ...LEGACY_COMPLETION_ATOM_ID_SET, HELPER_ID, VOID_RAY_ID]);
     const CLEAN_ONE_TIME_UNITS = getUserConfigIds(SELECTION_CONFIG["1회선택"]);
     const CLEAN_UNIT_QTY_CAPS = Object.fromEntries(Object.entries(getUserConfigMap(SELECTION_CONFIG["최대수량"]))
@@ -206,7 +202,7 @@
        03. 데이터·상태·캐시·저장
        ========================================================================== */
     const unitMap = new Map(), activeUnits = new Map(), pausedUnits = new Map(), completedUnits = new Map(), depCache = new Map();
-    const completedTargets = new Map(), _invenboardAutoCompletedUnits = new Map(), _invenboardManualInputs = new Map(), _unitNativeLevels = new Map(), _unitRestoreLevels = new Map();
+    const completedTargets = new Map(), _unitNativeLevels = new Map(), _unitRestoreLevels = new Map();
     const _selectionResetRetainedCompleted = new Map();
     let _actionFeedbackTimer = null;
     const _depVisiting = new Set();
@@ -297,36 +293,6 @@
         return false;
     }
 
-    // 이전 버전의 재료 보드 저장 항목은 데이터 소실 방지를 위해 읽기·저장만 유지한다.
-    function pruneInvenboardAutoCompletedUnits() {
-        for (const [uid, rawQty] of [..._invenboardAutoCompletedUnits.entries()]) {
-            const trackedQty = Math.max(0, parseInt(rawQty, 10) || 0);
-            const completedQty = Math.max(0, parseInt(completedUnits.get(uid), 10) || 0);
-            const nextQty = Math.min(trackedQty, completedQty);
-            if (nextQty > 0 && unitMap.has(uid) && !activeUnits.has(uid) && !completedTargets.has(uid)) {
-                _invenboardAutoCompletedUnits.set(uid, nextQty);
-            } else {
-                _invenboardAutoCompletedUnits.delete(uid);
-            }
-        }
-    }
-
-    function pruneInvenboardManualInputs() {
-        let changed = false;
-        for (const [rawId, rawQty] of [..._invenboardManualInputs.entries()]) {
-            _invenboardManualInputs.delete(rawId);
-            const id = normalizeSavedId(rawId);
-            const qty = Math.max(0, parseInt(rawQty, 10) || 0);
-            if (!id || !LEGACY_MATERIAL_SLOT_ID_SET.has(id) || qty <= 0) {
-                changed = true;
-                continue;
-            }
-            _invenboardManualInputs.set(id, qty);
-            if (id !== rawId || qty !== rawQty) changed = true;
-        }
-        return changed;
-    }
-
     function initializeCacheEngine() {
         depCache.clear();
         _boardRequirementsCache.clear(); _costboardTotalsCache.clear(); _unitEssencePartsCache.clear();
@@ -366,8 +332,6 @@
         normalizeMap(completedTargets);
         normalizeMap(completedUnits, { allowAutoCost: true, keepCompletedQty: true });
         pruneSelectionResetRetainedCompleted();
-        pruneInvenboardAutoCompletedUnits();
-        pruneInvenboardManualInputs();
         activeUnits.forEach((_, uid) => pausedUnits.delete(uid));
         completedTargets.forEach((_, uid) => {
             activeUnits.delete(uid);
@@ -398,8 +362,6 @@
             completed: [...completedUnits],
             selectionResetRetainedCompleted: [..._selectionResetRetainedCompleted],
             completedTargets: [...completedTargets],
-            invenboardAutoCompleted: [..._invenboardAutoCompletedUnits],
-            invenboardManualInputs: [..._invenboardManualInputs],
             cartTab: _cartTab,
             presetUsed: [..._presetUsed],
             hideCompleted: _hideCompleted
@@ -418,8 +380,6 @@
             completedUnits.clear();
             _selectionResetRetainedCompleted.clear();
             completedTargets.clear();
-            _invenboardAutoCompletedUnits.clear();
-            _invenboardManualInputs.clear();
             _presetUsed.clear();
 
             hydrateSavedUnitMap(state.active, activeUnits);
@@ -427,14 +387,6 @@
             hydrateSavedUnitMap(state.completed, completedUnits, { allowAutoCost: true, keepCompletedQty: true });
             hydrateSavedUnitMap(state.selectionResetRetainedCompleted, _selectionResetRetainedCompleted, { allowAutoCost: true, keepCompletedQty: true });
             hydrateSavedUnitMap(state.completedTargets, completedTargets);
-            hydrateSavedUnitMap(state.invenboardAutoCompleted, _invenboardAutoCompletedUnits, { keepCompletedQty: true });
-            if (Array.isArray(state.invenboardManualInputs)) {
-                state.invenboardManualInputs.forEach(entry => {
-                    if (!Array.isArray(entry) || entry.length < 2) return;
-                    const id = normalizeSavedId(entry[0]), qty = parseInt(entry[1], 10);
-                    if (LEGACY_MATERIAL_SLOT_ID_SET.has(id) && Number.isFinite(qty) && qty > 0) _invenboardManualInputs.set(id, qty);
-                });
-            }
             _cartTab = isValidCartTab(state.cartTab) ? state.cartTab : 'active';
             if (Array.isArray(state.presetUsed)) {
                 state.presetUsed.forEach(entry => {
@@ -452,13 +404,13 @@
             completedUnits.clear();
             _selectionResetRetainedCompleted.clear();
             completedTargets.clear();
-            _invenboardAutoCompletedUnits.clear();
-            _invenboardManualInputs.clear();
             _presetUsed.clear();
         }
     }
 
     function saveNexusState() {
+        // 나의 조합 독립 창은 원본 저장 데이터를 읽기만 한다.
+        if (IS_STANDALONE_BUILD) return;
         try {
             sanitizeRuntimeState();
             localStorage.setItem(SYSTEM_CONFIG.storageKeys.saveData, JSON.stringify(getPersistedStatePayload()));
@@ -500,8 +452,7 @@
             updateBoardPanel(calcResult);
             updateCartUI();
             updatePresetBtns();
-            // 독립 창은 원본 저장 데이터를 읽기만 하며 덮어쓰지 않는다.
-            if (!IS_STANDALONE_BUILD) saveNexusState();
+            saveNexusState();
         });
     }
 
@@ -1130,7 +1081,6 @@
         activeUnits.delete(uid);
         deleteCompletedRecipe(uid, qty || 1);
         completedUnits.delete(uid);
-        _invenboardAutoCompletedUnits.delete(uid);
     }
 
     function releaseCompletedTarget(uid, { restoreToActive = false } = {}) {
@@ -1139,7 +1089,6 @@
         completedTargets.delete(uid);
         deleteCompletedRecipe(uid, qty);
         completedUnits.delete(uid);
-        _invenboardAutoCompletedUnits.delete(uid);
         if (restoreToActive) setActiveUnitQty(uid, qty);
         return true;
     }
@@ -1239,7 +1188,7 @@
 
         _restoreAllPendingTimer = setTimeout(() => {
             _restoreAllPendingTimer = null;
-            activeUnits.clear(); pausedUnits.clear(); completedUnits.clear(); _selectionResetRetainedCompleted.clear(); completedTargets.clear(); _invenboardAutoCompletedUnits.clear(); _invenboardManualInputs.clear();
+            activeUnits.clear(); pausedUnits.clear(); completedUnits.clear(); _selectionResetRetainedCompleted.clear(); completedTargets.clear();
             _presetUsed.clear(); updatePresetBtns(); commitNexusStateChange();
             if (!btn || !label) return;
             _restoreAllCooldown = true;
@@ -1258,8 +1207,6 @@
     function resetCompletedMaterialsByLevel(level) {
         getGroupRestoreIds(level).forEach(uid => {
             completedUnits.delete(uid);
-            _invenboardAutoCompletedUnits.delete(uid);
-            _invenboardManualInputs.delete(uid);
             _selectionResetRetainedCompleted.delete(uid);
         });
     }
@@ -1275,8 +1222,6 @@
             });
             completedUnits.clear();
             _selectionResetRetainedCompleted.clear();
-            _invenboardAutoCompletedUnits.clear();
-            _invenboardManualInputs.clear();
             _presetUsed.clear(); updatePresetBtns();
         } else {
             resetCompletedMaterialsByLevel(level);
@@ -2340,7 +2285,7 @@
     }
 
     /* ==========================================================================
-       11. 나의 조합·독립 창
+       11. 나의 조합·독립 창·선택 목록
        ========================================================================== */
 
 
@@ -2396,7 +2341,7 @@
         });
     }
 
-    /* 장바구니 */
+    /* 나의 조합: 선택·보류·완료 목록 */
     function pauseCartUnit(uid) {
         if (!activeUnits.has(uid) || !unitMap.has(uid)) return;
         const qty = activeUnits.get(uid) || 1;
@@ -3010,7 +2955,6 @@
     };
     window.addEventListener('orientationchange', handleViewportChange);
     window.addEventListener('resize', handleViewportChange);
-    window.addEventListener('focus', updateBuildWindowButton);
     window.addEventListener('focus', updatePivotColumns);
 
     /* 화면 스와이프 이벤트 */

@@ -48,6 +48,7 @@ svg { display:block; width:20px; height:20px; flex-shrink:0; }
 .gh-right { display:flex; flex:0 0 auto; align-items:center; gap:10px; padding-inline:10px; margin:0 0 0 auto; }
 .gh-tool-btn { display:inline-flex; align-items:center; justify-content:center; flex:0 0 34px; width:34px; height:34px; padding:0; border:1px solid #444047; border-radius:8px; background:#17171c; color:#e6c89e; text-decoration:none; font:17px var(--font-mono); line-height:1; }
 .gh-tool-btn:hover,.gh-tool-btn[aria-expanded="true"] { border-color:var(--accent); background:#28231c; color:#fff0cb; }
+
 /* 태블릿·모바일에서는 조합·재료 독립 창 실행 버튼을 숨긴다. 독립 창 내부의 닫기 버튼은 유지. */
 @media (max-width:1024px),
        (hover:none) and (pointer:coarse) and (max-width:1366px) {
@@ -147,7 +148,7 @@ html.nexus-standalone-build,html.nexus-standalone-build body { height:auto; min-
 @media (min-width:1025px) and (max-width:1366px) and (min-height:601px) and (max-height:1024px) {
     .main-layout { margin-top:42px; height:calc(100dvh - 42px); }
 }
-/* 세로형 순서: 도감→필요재료→목록 / 필요재료→히든보드→목록 */
+/* 세로형 순서: 도감 → 나의 조합 / 나의 조합(필요 재료) → 히든 보드 → 목록 */
 @media (max-width:1024px),
        (min-width:1025px) and (max-aspect-ratio:11/10),
        (hover:none) and (pointer:coarse) and (min-width:768px) and (max-width:1366px) and (min-height:600px) {
@@ -418,7 +419,7 @@ html.nexus-standalone-build,html.nexus-standalone-build body { height:auto; min-
     .uc-limit { font-size:9px; }
 }
 
-/* 우측 조합 목록 / 정수 합계 */
+/* 나의 조합 / 필요 재료 / 정수 / 선택 유닛 목록 */
 .inspector-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:16px 18px 10px; flex-shrink:0; }
 .inspector-heading h2 { font-size:calc(15px * var(--fs-scale)); letter-spacing:-.5px;  color:#ead7ad; }
 .inspector-window-controls { position:relative; flex-shrink:0; }
@@ -752,9 +753,6 @@ body .nexus-labelled-control.is-label-visible > .nexus-action-label{max-width:va
 @media(prefers-reduced-motion:reduce){body .nexus-labelled-control,body .nexus-labelled-control > .nexus-action-label{transition:none!important;}}
     
 body .nexus-labelled-control[hidden]{display:none!important}
-
-/* 글로벌 헤더의 조합 독립 창 버튼 활성 상태 */
-.gh-tool-btn.is-active{border-color:var(--accent);background:#28231c;color:#fff0cb;}
 
 @media (prefers-reduced-motion:reduce) { .reset-btn-pending::after { animation:none; } }
 
