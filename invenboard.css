@@ -1,0 +1,65 @@
+/* 재료 보드 — 현재 패널 계열과 동일한 표면·제목·스크롤 구조 */
+.main-layout.view-invenboard .panel-left { display:none; }
+.main-layout.view-invenboard .panel-right { min-width:0; min-height:0; }
+#boardContent.invenboard-mode { padding:0; overflow-y:auto; scrollbar-width:none; }
+#boardContent.invenboard-mode::-webkit-scrollbar { display:none; }
+.invenboard-workspace { min-height:100%; padding:0; border:0; border-radius:0; background:transparent; overflow:visible; }
+.invenboard-workspace-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 16px 16px; border-bottom:1px solid #292b32; background:transparent; }
+.invenboard-workspace-title { flex:none; color:var(--g); font-size:calc(14px * var(--fs-scale)); font-weight:700; }
+.invenboard-actions-host { flex:0 1 auto; min-width:0; margin-left:auto; }
+.invenboard-workspace-body { padding:16px; background:transparent; }
+.invenboard-workspace .empty-msg { margin-bottom:12px; }
+/* 재료 작업 버튼 — 히든 보드의 구분선 있는 텍스트 액션 스타일 */
+.invenboard-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; column-gap:25px; row-gap:5px; padding:0; border:0; }
+.invenboard-actions .pc-btn { position:relative; display:inline-flex; align-items:center; justify-content:center; gap:7px;
+    min-height:32px; padding:6px 2px; border:0; border-radius:3px; background:transparent;
+    color:#e7d2b0; font-size:10px; font-weight:500; line-height:1.4; white-space:nowrap;
+    transition:color .18s,background .18s; }
+.invenboard-actions .pc-btn + .pc-btn::before { content:""; position:absolute; left:-13px; top:50%; width:1px; height:14px;
+    background:var(--line); transform:translateY(-50%); pointer-events:none; }
+.invenboard-actions .pc-btn:hover:not(:disabled) { color:var(--g); background:#efd3a409; }
+.invenboard-actions .pc-btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+@media (min-width:1025px) and (min-aspect-ratio:11/10) and (hover:hover) and (pointer:fine) {
+    .invenboard-actions .pc-btn { font-size:calc(13px * var(--fs-scale)); }
+}
+.board-action-icon { display:inline-flex; align-items:center; justify-content:center; flex:0 0 14px; min-width:14px;
+    color:inherit; font-size:13px; line-height:1; }
+.invenboard-actions .invenboard-reset { color:var(--text-muted); }
+.invenboard-actions .invenboard-mode-input.is-manual,
+.invenboard-actions .invenboard-slot-toggle.is-expanded { color:var(--g); }
+.invenboard-actions .pc-btn:disabled { opacity:.38; }
+.invenboard-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:9px; }
+.invenboard-slot { display:flex; min-width:0; min-height:157px; border:1px solid #25272d; border-radius:10px; overflow:hidden; background:#000; transition:border-color .18s,background .18s,box-shadow .18s; box-shadow:none; }
+.invenboard-slot.has-active { border-color:var(--card-tone,var(--accent)); background:color-mix(in srgb,var(--card-tone,var(--accent)) 5%,#14161d); box-shadow:inset 0 1px 0 #ffffff0b; }
+.invenboard-slot:not(.has-active) .invenboard-controls { background:#000; }
+.invenboard-slot:not(.has-active) .invenboard-controls .pc-btn { background:transparent; }
+.invenboard-item { flex:1; min-width:0; display:flex; flex-direction:column; }
+.invenboard-item.is-disabled { opacity:.68; pointer-events:none; filter:grayscale(1); }
+.invenboard-item.is-disabled .invenboard-grade { border-color:transparent; background:transparent; color:var(--text-muted); }
+.invenboard-item.is-disabled .invenboard-input { border-color:var(--line); }
+.invenboard-item.is-disabled .invenboard-qty-caption { visibility:hidden; }
+.invenboard-main { --invenboard-value-height:34px; padding:10px 10px 9px; display:flex; flex:1; flex-direction:column; align-items:stretch; gap:4px; }
+.invenboard-tap { display:flex; flex-direction:column; justify-content:center; align-items:center; flex:0 0 var(--invenboard-value-height); height:var(--invenboard-value-height); min-height:var(--invenboard-value-height); width:100%; margin-top:auto; border:0; border-radius:6px; background:transparent; color:#f5f6fa; }
+.invenboard-tap:disabled { opacity:1; }
+.invenboard-count { font:700 26px/1.12 var(--font-mono); letter-spacing:-.8px; text-shadow:none; }
+.invenboard-name { display:flex; align-items:center; justify-content:center; min-height:2.5em; width:100%; text-align:center; font-size:calc(12px * var(--fs-scale)); font-weight:650; line-height:1.25; overflow-wrap:anywhere; word-break:keep-all; }
+.invenboard-grade.gtag { align-self:center; font-size:9px; padding:2px 6px; }
+.invenboard-qty-caption { flex:none; color:#98a2b2; font-size:calc(9px * var(--fs-scale)); line-height:1; letter-spacing:.03em; text-align:center; }
+.invenboard-controls { display:grid; grid-template-columns:1fr 1fr; gap:5px; padding:7px; border-top:1px solid #ffffff14; background:#0e1016; }
+.invenboard-controls .pc-btn { min-width:0; min-height:28px; padding:5px 3px; border-color:#343842; border-radius:5px; background:#1b1e25; color:#eef1f6; font-size:calc(11px * var(--fs-scale)); font-weight:650; line-height:1.2; }
+.invenboard-controls .pc-btn:hover:not(:disabled) { border-color:var(--card-tone,var(--accent)); background:#262831; }
+.invenboard-manual-value { display:none; flex:0 0 var(--invenboard-value-height); height:var(--invenboard-value-height); width:100%; margin-top:auto; }
+.invenboard-input { display:none; width:100%; min-width:0; height:var(--invenboard-value-height); outline:none; border:1px solid color-mix(in srgb,var(--card-tone,var(--accent)) 70%,#303139); border-radius:6px; background:#0c0d12; color:#fff; text-align:center; font:700 25px var(--font-mono); appearance:textfield; -moz-appearance:textfield; }
+.invenboard-input::-webkit-inner-spin-button,.invenboard-input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+.invenboard-input::placeholder { color:inherit; opacity:1; }
+.invenboard-input:focus { border-color:var(--card-tone,var(--accent)); outline:1px solid var(--card-tone,var(--accent)); outline-offset:2px; }
+.invenboard-item.is-manual .invenboard-tap { display:none; }
+.invenboard-item.is-manual .invenboard-manual-value,.invenboard-item.is-manual .invenboard-input { display:block; }
+.invenboard-input.is-over-limit { border-color:#ae7261; background:#3c2220; color:#efb29f; }
+
+
+/* 재료보드 메뉴는 원본 PC 전용 동작을 유지한다. */
+@media (max-width:1024px), (max-aspect-ratio:11/10), (hover:none) and (pointer:coarse) {
+    #btnViewInvenboard { display:none; }
+}
+

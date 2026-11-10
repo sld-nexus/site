@@ -95,6 +95,7 @@
     // 자동 완료 그룹의 재료 판정은 사용자 수동 설정이 아닌 내부 규칙이다.
     const AUTO_COST_SLOT_RAWS = ['갓오타', '메시브', '자동포탑'];
     const AUTO_COST_SLOT_SET = new Set(AUTO_COST_SLOT_RAWS.map(clean));
+    const INVENBOARD_INPUT_STEPS = new Map([[clean('자동포탑'), 5]]);
     const AUTO_RECIPE_REQUIREMENT_SET = new Set(['갓오타', '메시브'].map(clean));
     const AUTO_COST_RAW_MAP = Object.fromEntries(AUTO_COST_SLOT_RAWS.map(id => [clean(id), id]));
     // 이전 버전 저장 데이터의 재료 완료값을 정규화하기 위한 호환 목록.
@@ -105,13 +106,24 @@
         "스투코프", "오딘", "혼종파멸자", "분노수호자", "혼종약탈자"
     ];
     const LEGACY_COMPLETION_RAW_MAP = Object.fromEntries(LEGACY_COMPLETION_ATOMS.map(atom => [clean(atom), atom]));
+    // 재료보드의 확장 20종은 기존 저장 데이터와 같은 정규화 목록을 사용한다.
+    const INVENBOARD_EXPANSION_ATOMS = LEGACY_COMPLETION_ATOMS;
+
     const LEGACY_COMPLETION_ATOM_ID_SET = new Set(LEGACY_COMPLETION_ATOMS.map(clean));
     const HELPER_ID = clean('도우미');
     const VOID_RAY_ATOM = '공허포격기';
     const VOID_RAY_ID = clean(VOID_RAY_ATOM);
     const isAutoRecipeRequirementSatisfied = (id) =>
         AUTO_RECIPE_REQUIREMENT_SET.has(id) ||
-        (_currentViewMode === 'hiddenboard' && id === HELPER_ID);
+        ((_currentViewMode === 'hiddenboard' || _currentViewMode === 'invenboard') && id === HELPER_ID);
+    const INVENBOARD_EXPANSION_ATOM_ID_SET = LEGACY_COMPLETION_ATOM_ID_SET;
+    const COSTBOARD_ATOM_ID_SET = new Set(SYSTEM_CONFIG.costboardAtoms.map(clean));
+    const INVENBOARD_SLOT_SET = new Set([...COSTBOARD_ATOM_ID_SET, ...AUTO_COST_SLOT_SET, HELPER_ID, VOID_RAY_ID]);
+    const ALL_INVENBOARD_SLOT_SET = new Set([...INVENBOARD_SLOT_SET, ...INVENBOARD_EXPANSION_ATOM_ID_SET]);
+    const CLEAN_INVENBOARD_INSTANT_COMPLETE = getUserConfigIds(USER_CONFIG["재료보드즉시완료"]);
+    const INVENBOARD_CORE_ATOMS = Object.freeze([...SYSTEM_CONFIG.costboardAtoms, VOID_RAY_ATOM]);
+    const INVENBOARD_ALL_ATOMS = Object.freeze([...INVENBOARD_CORE_ATOMS, ...INVENBOARD_EXPANSION_ATOMS]);
+    const INVENBOARD_CORE_CALC_ATOMS = Object.freeze([...SYSTEM_CONFIG.costboardAtoms]);
     const COSTBOARD_COMPLETION_ID_SET = new Set([...SYSTEM_CONFIG.costboardAtoms.map(clean), ...AUTO_COST_SLOT_SET, ...LEGACY_COMPLETION_ATOM_ID_SET, HELPER_ID, VOID_RAY_ID]);
     const CLEAN_ONE_TIME_UNITS = getUserConfigIds(SELECTION_CONFIG["1회선택"]);
     const CLEAN_UNIT_QTY_CAPS = Object.fromEntries(Object.entries(getUserConfigMap(SELECTION_CONFIG["최대수량"]))
@@ -133,6 +145,7 @@
             ? { atoms: [VOID_RAY_ATOM] }
             : slot
     );
+    const INVENBOARD_EXPANSION_SLOT_DEFS = INVENBOARD_EXPANSION_ATOMS.map(atom => ({ atoms: [atom] }));
     const GROUP_DEFS = SYSTEM_CONFIG.groupDefs;
     const titleToGridId = Object.fromEntries(GROUP_DEFS.map(g => [g.title, g.pid]));
     const FAVORITES_KEY = SYSTEM_CONFIG.storageKeys?.favorites || 'nexusFavorites';
@@ -177,6 +190,17 @@
     const getToolNeed = (parent) => CLEAN_TOOLS_MAP[parent] || [];
     const isRestrictedUnit = (id) => CLEAN_RESTRICTED_IDS.has(id);
     const getGradeIndex = (grade) => GRADE_INDEX_MAP.has(grade) ? GRADE_INDEX_MAP.get(grade) : -99;
+    const isInvenboardInstantCompleteUnit = (uid) => CLEAN_INVENBOARD_INSTANT_COMPLETE.has(clean(uid));
+    const getInvenboardAtomGrade = (atom) => AUTO_COST_SLOT_SET.has(clean(atom)) ? '스킬사용' : (unitMap.get(clean(atom))?.grade || '');
+    const renderInvenboardGradeTag = (atom) => {
+        const grade = getInvenboardAtomGrade(atom);
+        return grade ? `<span class="invenboard-grade gtag grade-${grade}">${escapeHtml(grade)}</span>` : '';
+    };
+    const getInvenboardAtomNameStyle = (atom) => {
+        const color = SYSTEM_CONFIG.grades.colors[getInvenboardAtomGrade(atom)];
+        return color ? ` style="color:${color};"` : '';
+    };
+
     const isOneTime = (u) => u && (CLEAN_ONE_TIME_UNITS.has(u.id) || getGradeIndex(u.grade) >= getGradeIndex(SYSTEM_CONFIG.policy.oneTimeMinGrade || "슈퍼히든"));
     const getUnitNameStyle = (unit) => {
         const color = SYSTEM_CONFIG.grades.colors[unit?.grade];
@@ -202,12 +226,12 @@
        03. 데이터·상태·캐시·저장
        ========================================================================== */
     const unitMap = new Map(), activeUnits = new Map(), pausedUnits = new Map(), completedUnits = new Map(), depCache = new Map();
-    const completedTargets = new Map(), _unitNativeLevels = new Map(), _unitRestoreLevels = new Map();
+    const completedTargets = new Map(), _invenboardAutoCompletedUnits = new Map(), _invenboardManualInputs = new Map(), _unitNativeLevels = new Map(), _unitRestoreLevels = new Map();
     const _selectionResetRetainedCompleted = new Map();
     let _actionFeedbackTimer = null;
     const _depVisiting = new Set();
     const GRADE_INDEX_MAP = new Map(SYSTEM_CONFIG.grades.order.map((grade, index) => [grade, index]));
-    const _boardRequirementsCache = new Map(), _costboardTotalsCache = new Map(), _unitEssencePartsCache = new Map();
+    const _boardRequirementsCache = new Map(), _costboardTotalsCache = new Map(), _directInvenboardAtomNeedCache = new Map(), _unitEssencePartsCache = new Map();
     const _hiddenboardSlotElsByUid = new Map(), _unitCardElsByUid = new Map(), _favoriteBtnElsByUid = new Map(), _dirtyUnitCardIds = new Set();
     let _unitboardDomIndexed = false, _lastUnitboardQtyByUid = new Map();
 
@@ -220,15 +244,16 @@
     })());
     let _unitboardCollection = null;
     let _activeTabIdx = 0, _currentViewMode = 'unitboard', _currentHighlight = null, _hideCompleted = false;
+    let _invenboardInputMode = 'auto', _isInvenboardSlotsExpanded = false, _isInvenboardRendered = false;
     let _highlightGroupState = null;
     let _cartTab = 'active', _isTabContentInitialized = false, _isHiddenboardRendered = false;
     let repeatTimer = null, repeatDelayTimer = null, _lastInteractionTime = 0, _currentAccelInterval = APP_INTERNAL.accelInterval, _touchHoldCount = 0, _smartChangePointerCardUid = null;
     let updateTimer = null, _completeLock = new Set(), _presetUsed = new Map(), _restoreAllCooldown = false;
     let _restoreAllPendingTimer = null;
     let _lastCalcResult = null;
-    let _fontRepeatTimer = null, _fontRepeatDelayTimer = null, _swipeTimer = null;
+    let _fontRepeatTimer = null, _fontRepeatDelayTimer = null;
     let _titleRotationTimer = null, _titleTransitionTimer = null, _titleVersionTimer = null;
-    let _isSwiping = false;
+    
     let _presetTab = '일반 프리셋';
     let _fontScale = 1.0;
     const IS_STANDALONE_BUILD = new URLSearchParams(window.location.search).get('nexusStandalone') === 'build';
@@ -293,9 +318,67 @@
         return false;
     }
 
+    // 재료보드 저장 상태 복원·정규화
+    function addInvenboardAutoCompletedUnit(uid, qty) {
+        const amount = Math.max(0, parseInt(qty, 10) || 0);
+        if (amount <= 0 || !unitMap.has(uid)) return;
+        _invenboardAutoCompletedUnits.set(uid, Math.max(0, _invenboardAutoCompletedUnits.get(uid) || 0) + amount);
+    }
+
+    function pruneInvenboardAutoCompletedUnits() {
+        for (const [uid, rawQty] of [..._invenboardAutoCompletedUnits.entries()]) {
+            const trackedQty = Math.max(0, parseInt(rawQty, 10) || 0);
+            const completedQty = Math.max(0, parseInt(completedUnits.get(uid), 10) || 0);
+            const nextQty = Math.min(trackedQty, completedQty);
+            if (nextQty > 0 && unitMap.has(uid) && !activeUnits.has(uid) && !completedTargets.has(uid)) {
+                _invenboardAutoCompletedUnits.set(uid, nextQty);
+            } else {
+                _invenboardAutoCompletedUnits.delete(uid);
+            }
+        }
+    }
+
+    function pruneInvenboardManualInputs() {
+        let changed = false;
+        for (const [rawId, rawQty] of [..._invenboardManualInputs.entries()]) {
+            _invenboardManualInputs.delete(rawId);
+            const id = normalizeSavedId(rawId);
+            const qty = Math.max(0, parseInt(rawQty, 10) || 0);
+            if (!id || !ALL_INVENBOARD_SLOT_SET.has(id) || qty <= 0) {
+                changed = true;
+                continue;
+            }
+            _invenboardManualInputs.set(id, qty);
+            if (id !== rawId || qty !== rawQty) changed = true;
+        }
+        return changed;
+    }
+
+    function clearInvenboardManualInputs(ids = ALL_INVENBOARD_SLOT_SET) {
+        let changed = false;
+        ids.forEach(id => {
+            if (_invenboardManualInputs.delete(id)) changed = true;
+        });
+        return changed;
+    }
+
+    function resetInvenboardAutoCompletedUnits() {
+        let changed = false;
+        for (const [uid, qty] of [..._invenboardAutoCompletedUnits.entries()]) {
+            if (!completedUnits.has(uid)) {
+                _invenboardAutoCompletedUnits.delete(uid);
+                continue;
+            }
+            subtractCompletedUnitQty(uid, qty);
+            changed = true;
+        }
+        pruneInvenboardAutoCompletedUnits();
+        return changed;
+    }
+
     function initializeCacheEngine() {
         depCache.clear();
-        _boardRequirementsCache.clear(); _costboardTotalsCache.clear(); _unitEssencePartsCache.clear();
+        _boardRequirementsCache.clear(); _costboardTotalsCache.clear(); _directInvenboardAtomNeedCache.clear(); _unitEssencePartsCache.clear();
         unitMap.forEach(u => {
             u.parsedCost = [];
             if (u.cost && !IGNORE_PARSE_RECIPES.includes(u.cost)) {
@@ -332,6 +415,8 @@
         normalizeMap(completedTargets);
         normalizeMap(completedUnits, { allowAutoCost: true, keepCompletedQty: true });
         pruneSelectionResetRetainedCompleted();
+        pruneInvenboardAutoCompletedUnits();
+        pruneInvenboardManualInputs();
         activeUnits.forEach((_, uid) => pausedUnits.delete(uid));
         completedTargets.forEach((_, uid) => {
             activeUnits.delete(uid);
@@ -340,6 +425,14 @@
         if (!isValidCartTab(_cartTab)) _cartTab = 'active';
     }
 
+    const getInvenboardTrackedTargets = (source = activeUnits) => {
+        const tracked = new Map(source instanceof Map ? source : []);
+        if (source === activeUnits) completedTargets.forEach((qty, uid) => {
+            const amount = Math.max(0, parseInt(qty, 10) || 0);
+            if (amount > 0) tracked.set(uid, (tracked.get(uid) || 0) + amount);
+        });
+        return tracked;
+    };
     const UNIT_ID_ALIASES = Object.freeze({ '테사다르': '태사다르', '케이다란초석': '케이다린초석' });
     const normalizeSavedId = (id) => {
         const normalized = typeof id === 'string' ? clean(id) : '';
@@ -362,6 +455,8 @@
             completed: [...completedUnits],
             selectionResetRetainedCompleted: [..._selectionResetRetainedCompleted],
             completedTargets: [...completedTargets],
+            invenboardAutoCompleted: [..._invenboardAutoCompletedUnits],
+            invenboardManualInputs: [..._invenboardManualInputs],
             cartTab: _cartTab,
             presetUsed: [..._presetUsed],
             hideCompleted: _hideCompleted
@@ -380,6 +475,8 @@
             completedUnits.clear();
             _selectionResetRetainedCompleted.clear();
             completedTargets.clear();
+            _invenboardAutoCompletedUnits.clear();
+            _invenboardManualInputs.clear();
             _presetUsed.clear();
 
             hydrateSavedUnitMap(state.active, activeUnits);
@@ -387,6 +484,14 @@
             hydrateSavedUnitMap(state.completed, completedUnits, { allowAutoCost: true, keepCompletedQty: true });
             hydrateSavedUnitMap(state.selectionResetRetainedCompleted, _selectionResetRetainedCompleted, { allowAutoCost: true, keepCompletedQty: true });
             hydrateSavedUnitMap(state.completedTargets, completedTargets);
+            hydrateSavedUnitMap(state.invenboardAutoCompleted, _invenboardAutoCompletedUnits, { keepCompletedQty: true });
+            if (Array.isArray(state.invenboardManualInputs)) {
+                state.invenboardManualInputs.forEach(entry => {
+                    if (!Array.isArray(entry) || entry.length < 2) return;
+                    const id = normalizeSavedId(entry[0]), qty = parseInt(entry[1], 10);
+                    if (ALL_INVENBOARD_SLOT_SET.has(id) && Number.isFinite(qty) && qty > 0) _invenboardManualInputs.set(id, qty);
+                });
+            }
             _cartTab = isValidCartTab(state.cartTab) ? state.cartTab : 'active';
             if (Array.isArray(state.presetUsed)) {
                 state.presetUsed.forEach(entry => {
@@ -404,6 +509,8 @@
             completedUnits.clear();
             _selectionResetRetainedCompleted.clear();
             completedTargets.clear();
+            _invenboardAutoCompletedUnits.clear();
+            _invenboardManualInputs.clear();
             _presetUsed.clear();
         }
     }
@@ -440,19 +547,20 @@
         if (updateTimer) cancelAnimationFrame(updateTimer);
         updateTimer = requestAnimationFrame(() => {
             let calcResult = calculateBoardRequirements();
-            let costboardTotals = calculateCostboardAtomTotals();
+            let costboardTotals = _currentViewMode === 'invenboard' ? calculateInvenboardCostboardTotals() : calculateCostboardAtomTotals();
             if (clampCompletedUnits(calcResult, costboardTotals)) {
                 calcResult = calculateBoardRequirements();
-                costboardTotals = calculateCostboardAtomTotals();
+                costboardTotals = _currentViewMode === 'invenboard' ? calculateInvenboardCostboardTotals() : calculateCostboardAtomTotals();
             }
             _lastCalcResult = calcResult;
             updateCostboard(costboardTotals, calcResult);
             updateTabsUI();
             updateTabContentUI();
-            updateBoardPanel(calcResult);
+            updateBoardPanel(calcResult, _currentViewMode === 'invenboard' ? costboardTotals : null);
             updateCartUI();
             updatePresetBtns();
-            saveNexusState();
+            // 독립 창은 원본 저장 데이터를 읽기만 하며 덮어쓰지 않는다.
+            if (!IS_STANDALONE_BUILD) saveNexusState();
         });
     }
 
@@ -986,7 +1094,7 @@
     function clampCompletedUnits(calcResult, costboardTotals = null) {
         pruneSelectionResetRetainedCompleted();
         const { baseMap, baseAutoCostReq } = calcResult || calculateBoardRequirements();
-        const resolvedCostboardTotals = costboardTotals || calculateCostboardAtomTotals();
+        const resolvedCostboardTotals = costboardTotals || (_currentViewMode === 'invenboard' ? calculateInvenboardCostboardTotals() : calculateCostboardAtomTotals());
         let changed = false;
         for (let [uid, rawQty] of [...completedUnits.entries()]) {
             const compQty = parseInt(rawQty, 10);
@@ -1041,21 +1149,15 @@
         return ids;
     }
 
-    function getGroupRestoreDescription(level) {
-        if (level >= 5) return '완료된 목표를 선택 목록으로 돌리고, 모든 재료의 완료·보유량을 초기화합니다. 보류 목록은 유지합니다.';
-        if (level >= 4) return '직속·히든·기본 재료의 완료 상태를 함께 복구합니다. 목표와 보류 목록은 유지합니다.';
-        if (level >= 3) return '히든·기본 재료의 완료 상태를 함께 복구합니다. 목표와 보류 목록은 유지합니다.';
-        return '기본 재료의 완료 상태만 복구합니다. 목표와 보류 목록은 유지합니다.';
-    }
+    
+    /* 히든보드 전용 구현은 hiddenboard.js */
 
-    function updateGroupRestoreButtons() {
-        document.querySelectorAll('.grp-title-actions [data-action="resetGroup"]').forEach(btn => {
-            const level = parseInt(btn.dataset.level, 10), count = getGroupRestoreIds(level).size;
-            const description = getGroupRestoreDescription(level);
-            btn.disabled = count === 0;
-            btn.title = `${description} · ${count > 0 ? `복구 대상 ${count}종` : '복구할 항목 없음'}`;
-        });
-    }
+
+
+    
+    /* 히든보드 전용 구현은 hiddenboard.js */
+
+
 
     function subtractCompletedUnitQty(uid, qty) {
         const amount = Math.max(0, parseInt(qty, 10) || 0);
@@ -1071,7 +1173,7 @@
         const amount = Math.max(0, parseInt(multiplier, 10) || 0);
         if (amount <= 0) return;
         u.parsedRecipe?.forEach(child => {
-            if (!child.id || (_currentViewMode === 'hiddenboard' && child.id === HELPER_ID)) return;
+            if (!child.id || ((_currentViewMode === 'hiddenboard' || _currentViewMode === 'invenboard') && child.id === HELPER_ID)) return;
             const perUnitNeed = isToolRequirement(uid, child.id) ? 1 : child.qty;
             subtractCompletedUnitQty(child.id, perUnitNeed * amount);
         });
@@ -1081,14 +1183,26 @@
         activeUnits.delete(uid);
         deleteCompletedRecipe(uid, qty || 1);
         completedUnits.delete(uid);
+        _invenboardAutoCompletedUnits.delete(uid);
+    }
+
+    function resetInvenboardOwnedForUnit(uid, qty) {
+        const source = new Map([[uid, normalizeUnitQty(uid, qty) || 1]]);
+        const { targetMap } = calculateInvenboardCostboardTotals(new Map(), { activeSource: source, rawCompleted: true });
+        getInvenboardAtoms().forEach(atom => {
+            const amount = Math.max(0, parseInt(targetMap[atom], 10) || 0);
+            if (amount > 0) subtractCompletedUnitQty(clean(atom), amount);
+        });
     }
 
     function releaseCompletedTarget(uid, { restoreToActive = false } = {}) {
         if (!completedTargets.has(uid) || !unitMap.has(uid)) return false;
         const qty = completedTargets.get(uid) || 1;
         completedTargets.delete(uid);
-        deleteCompletedRecipe(uid, qty);
+        if (_currentViewMode === 'invenboard') resetInvenboardOwnedForUnit(uid, qty);
+        else deleteCompletedRecipe(uid, qty);
         completedUnits.delete(uid);
+        _invenboardAutoCompletedUnits.delete(uid);
         if (restoreToActive) setActiveUnitQty(uid, qty);
         return true;
     }
@@ -1101,65 +1215,11 @@
         return releaseCompletedTarget(uid);
     }
 
-    function completeUnit(uid, amount) {
-        if (_completeLock.has(uid)) return;
-        _completeLock.add(uid);
-        const cWrapEl = document.getElementById(`craft-wrap-${uid}`);
-        const lockBtns = cWrapEl ? Array.from(cWrapEl.querySelectorAll('button')) : [];
-        lockBtns.forEach(b => b.disabled = true);
-        try {
-            const { reqMap, baseMap, autoCostReq } = calculateBoardRequirements();
-            const isTarget = activeUnits.has(uid);
-            const isAutoCost = AUTO_COST_SLOT_SET.has(uid);
-            let isMergedSlot = false;
-            if (isTarget && !isAutoCost) {
-                activeUnits.forEach((_, activeId) => {
-                    if (activeId !== uid && unitMap.get(activeId)?.parsedRecipe?.some(pr => pr.id === uid)) isMergedSlot = true;
-                });
-            }
-            const isPureTarget = isTarget && !isMergedSlot && !isAutoCost;
-            let reqVal = 0;
-            if (isPureTarget) reqVal = Math.max(0, (activeUnits.get(uid) || 1) - (completedUnits.get(uid) || 0));
-            else if (isAutoCost) reqVal = autoCostReq[uid] || 0;
-            else if (isTarget && isMergedSlot) reqVal = Math.max(0, (baseMap.get(uid) || 1) - (completedUnits.get(uid) || 0));
-            else reqVal = reqMap.get(uid) || 0;
+    
+    /* 히든보드 전용 구현은 hiddenboard.js */
+    let completeUnit;
 
-            const requestedQty = amount !== undefined ? parseInt(amount, 10) : reqVal;
-            const processQty = requestedQty === 10 && reqVal < 10 ? 0 : Math.min(requestedQty, reqVal);
-            if (processQty > 0) {
-                const prevCompleted = completedUnits.get(uid) || 0;
-                deleteCompletedRecipe(uid, processQty);
-                const newComp = Math.max(prevCompleted, completedUnits.get(uid) || 0) + processQty;
-                completedUnits.set(uid, newComp);
 
-                if (isPureTarget) {
-                    if (newComp >= (activeUnits.get(uid) || 1)) {
-                        completedTargets.set(uid, activeUnits.get(uid) || 1);
-                        activeUnits.delete(uid);
-                        completedUnits.delete(uid);
-                    }
-                } else if (isTarget && isMergedSlot) {
-                    const totalQty = baseMap.get(uid) || 1;
-                    if (newComp >= totalQty) {
-                        const activeQty = activeUnits.get(uid) || 1;
-                        const matQty = totalQty - activeQty;
-                        completedTargets.set(uid, activeQty);
-                        activeUnits.delete(uid);
-                        if (matQty > 0) completedUnits.set(uid, matQty);
-                        else completedUnits.delete(uid);
-                    }
-                }
-                completeHiddenboardRecipeUnitsIfReady();
-                commitNexusStateChange({ clearHighlight: true });
-            } else {
-                lockBtns.forEach(b => b.disabled = false);
-            }
-        } catch {
-            lockBtns.forEach(b => b.disabled = false);
-        } finally {
-            setTimeout(() => { _completeLock.delete(uid); }, APP_INTERNAL.completeLockDelay);
-        }
-    }
 
     function restoreUnit(uid) {
         if (!restoreCompletedTarget(uid)) return;
@@ -1188,7 +1248,7 @@
 
         _restoreAllPendingTimer = setTimeout(() => {
             _restoreAllPendingTimer = null;
-            activeUnits.clear(); pausedUnits.clear(); completedUnits.clear(); _selectionResetRetainedCompleted.clear(); completedTargets.clear();
+            activeUnits.clear(); pausedUnits.clear(); completedUnits.clear(); _selectionResetRetainedCompleted.clear(); completedTargets.clear(); _invenboardAutoCompletedUnits.clear(); _invenboardManualInputs.clear();
             _presetUsed.clear(); updatePresetBtns(); commitNexusStateChange();
             if (!btn || !label) return;
             _restoreAllCooldown = true;
@@ -1207,29 +1267,17 @@
     function resetCompletedMaterialsByLevel(level) {
         getGroupRestoreIds(level).forEach(uid => {
             completedUnits.delete(uid);
+            _invenboardAutoCompletedUnits.delete(uid);
+            _invenboardManualInputs.delete(uid);
             _selectionResetRetainedCompleted.delete(uid);
         });
     }
 
-    function resetGroupCompleted(level) {
-        const ids = getGroupRestoreIds(level);
-        if (ids.size === 0) return;
-        if (level >= 5) {
-            const targetEntries = Array.from(completedTargets.entries());
-            completedTargets.clear();
-            targetEntries.forEach(([uid, qty]) => {
-                setActiveUnitQty(uid, (activeUnits.get(uid) || 0) + qty);
-            });
-            completedUnits.clear();
-            _selectionResetRetainedCompleted.clear();
-            _presetUsed.clear(); updatePresetBtns();
-        } else {
-            resetCompletedMaterialsByLevel(level);
-        }
-        const label = GROUP_DEFS.find(group => group.resetLevel === level)?.resetLabel || '완료 복구';
-        showActionFeedback(`${label} · ${ids.size}종 복구됨 ✓`);
-        commitNexusStateChange({ clearHighlight: true });
-    }
+    
+    /* 히든보드 전용 구현은 hiddenboard.js */
+    let resetGroupCompleted;
+
+
 
     function resetUnitboard() {
         if (activeUnits.size === 0) return;
@@ -1344,560 +1392,16 @@
     /* ==========================================================================
        08. 히든 보드
        ========================================================================== */
-
-
-    /* 히든보드 */
-    const BASIC_HIDDENBOARD_GRADES = new Set(["레어", "에픽", "유니크", "헬", "레전드"]);
-    const isBasicHiddenboardGrade = (grade) => BASIC_HIDDENBOARD_GRADES.has(grade);
-
-    function renderHiddenboard() {
-        if (_isHiddenboardRendered) return;
-        const boardEl = getEl('boardContent');
-        if (!boardEl) return;
-
-        const renderHiddenboardSlot = (id, n, g) => {
-            const unit = unitMap.get(id);
-            const essenceText = getUnitUnitboardEssenceText(unit);
-            const noticeHtml = getUnitCardNotesHtml(unit);
-            return `<div class="hiddenboard-slot" id="d-slot-wrap-${id}" data-uid="${id}" data-detail-view="usage"><div class="d-slot-main"><div class="d-name"><div class="d-grade-row"><div class="d-grade-left"><span class="gtag grade-${g}">${g}</span><span class="d-final-goal-tag" hidden>최종목표</span></div><button type="button" class="d-target-badge" data-action="toggleHighlight" data-uid="${id}" aria-label="${n} 목표추적" aria-pressed="false" title="직속부터 기초 재료까지 목표추적" hidden>목표추적</button></div><div class="d-name-line"><span class="d-name-inline">${n}${CLEAN_SPECIAL_CONDITIONS[id]?`<span class="badge-special-cond recipe-cond-offset">특수조건</span>`:''}</span></div>${noticeHtml}${essenceText}</div></div><div id="d-cond-${id}" class="d-cond-inline"></div><div class="d-detail-wrap"><div class="d-detail-tabs" role="group" aria-label="${n} 표시 정보"><button type="button" class="d-detail-tab is-active" data-action="switchHiddenboardDetail" data-uid="${id}" data-detail-view="usage" aria-pressed="true" aria-controls="d-reason-${id}">사용처</button><button type="button" class="d-detail-tab" data-action="switchHiddenboardDetail" data-uid="${id}" data-detail-view="recipe" aria-pressed="false" aria-controls="d-recipe-${id}">조합법</button></div><div class="d-detail-panels"><div class="d-reason-wrap" id="d-reason-${id}" aria-hidden="false"></div><div class="d-recipe-wrap" id="d-recipe-${id}" aria-hidden="true" inert></div></div></div><div class="d-goal-recipe-wrap" id="d-goal-recipe-${id}"></div><div id="craft-wrap-${id}" class="craft-wrap"></div></div>`;
-        };
-        const getGrp = (id, pid, title, resetLevel=0, isCol=false, alwaysShow=false, alwaysOpen=false, resetLabel='완료복구') => `
-            <div class="hiddenboard-group" id="${id}" style="${alwaysShow ? '' : 'display:none;'}" ${alwaysShow ? 'data-always-show="true"' : ''} ${alwaysOpen ? 'data-always-open="true"' : ''}>
-                <div class="hiddenboard-group-title" data-action="toggleGroup" data-grid-id="${pid}">
-                    <div class="grp-title-main">
-                        <span class="grp-toggle-icon" style="transform:${isCol?'rotate(-90deg)':'rotate(0deg)'};">▼</span>
-                        <span>${title}</span>
-                        ${resetLevel > 0 ? `<span class="grp-count-badge" id="grp-count-${pid}"></span>` : ''}
-                    </div>
-                    <div class="grp-title-actions" id="${id}-actions">
-                        ${resetLevel > 0 ? `<button type="button" class="btn-text-link" data-action="resetGroup" data-level="${resetLevel}" title="${getGroupRestoreDescription(resetLevel)}" disabled><span>${resetLabel}</span><span class="action-icon" aria-hidden="true">↺</span></button>` : ''}
-                    </div>
-                </div>
-                <div class="hiddenboard-grid" id="${pid}" ${isCol?'style="display:none;"':''}></div>
-            </div>`;
-
-        const allUnits = Array.from(unitMap.values());
-        const unitSlots = allUnits.filter(u => getGradeIndex(u.grade) >= getGradeIndex(SYSTEM_CONFIG.policy.minGradeForHiddenboard) && !AUTO_COST_SLOT_SET.has(u.id)).map(u => renderHiddenboardSlot(u.id, u.name, u.grade)).join('');
-
-        const _exIds = new Set((SYSTEM_CONFIG.policy.hideCompletedExcludeGroups || []).map(t => titleToGridId[t]).filter(Boolean));
-
-        returnHiddenboardControlsToHeader();
-        boardEl.innerHTML = `<div id="hiddenboard-empty-msg" class="empty-msg"></div><div id="hiddenboard-slot-pool" class="hiddenboard-slot-pool">${unitSlots}</div>` + GROUP_DEFS.map(g => getGrp(g.id, g.pid, g.title, g.resetLevel, g.isCol, g.alwaysShow, g.alwaysOpen, g.resetLabel)).join('');
-        boardEl.dataset.excludeGridIds = JSON.stringify([..._exIds]);
-        _hiddenboardSlotElsByUid.clear();
-        boardEl.querySelectorAll('.hiddenboard-slot[data-uid]').forEach(el => _hiddenboardSlotElsByUid.set(el.dataset.uid, el));
-        _isHiddenboardRendered = true;
-        placeHiddenboardControls();
-    }
-
-    function getHiddenboardRecipeQuantity(id, calcResult) {
-        const unit = unitMap.get(id);
-        const { reqMap, baseMap } = calcResult || _lastCalcResult || calculateBoardRequirements();
-        const requested = activeUnits.has(id)
-            ? (baseMap.get(id) || activeUnits.get(id) || 0)
-            : (reqMap.get(id) || 0);
-        const multi = isOneTime(unit) ? 1 : Math.max(requested, 1);
-        const qtyLimit = getUnitQtyLimit(id);
-        const hasSpecialLimit = isOneTime(unit) || !!CLEAN_UNIT_QTY_CAPS[id];
-        const countLabel = hasSpecialLimit
-            ? (multi === qtyLimit ? `${qtyLimit}개 제한` : `${multi}개 기준 · 최대 ${qtyLimit}개 제한`)
-            : `${multi}개 기준`;
-        return { multi, countLabel };
-    }
-
-    function renderHiddenboardRecipe(slotEl, calcResult) {
-        const id = slotEl.dataset.uid;
-        const unit = unitMap.get(id);
-        if (!unit) return;
-        const isGoal = slotEl.classList.contains('is-final-goal');
-        const recipeEl = slotEl.querySelector(isGoal ? '.d-goal-recipe-wrap' : '.d-recipe-wrap');
-        if (!recipeEl) return;
-        const { multi, countLabel } = getHiddenboardRecipeQuantity(id, calcResult);
-        const renderKey = `${multi}:${countLabel}`;
-        if (recipeEl._renderKey === renderKey) return;
-        if (isGoal) {
-            recipeEl.innerHTML = `<div class="uc-recipe-area"><span class="recipe-label">조합 조건<span class="d-recipe-count">${escapeHtml(countLabel)}</span></span>${formatRecipe(unit, multi)}</div>`;
-        } else {
-            recipeEl.innerHTML = `<div class="d-detail-title" style="color:${SYSTEM_CONFIG.grades.colors[unit.grade]}"><span>${escapeHtml(unit.name)} 조합법</span><span class="d-recipe-count">(${escapeHtml(countLabel)})</span></div><div class="d-recipe-content">${formatRecipe(unit, multi, true)}</div>`;
-        }
-        recipeEl._renderKey = renderKey;
-    }
-
-    function switchHiddenboardDetail(id, view, calcResult = null) {
-        const slotEl = _hiddenboardSlotElsByUid.get(id);
-        if (!slotEl || slotEl.classList.contains('is-final-goal')) return;
-        const activeView = view === 'recipe' ? 'recipe' : 'usage';
-        slotEl.dataset.detailView = activeView;
-        slotEl.querySelectorAll('.d-detail-tab').forEach(tab => {
-            const selected = tab.dataset.detailView === activeView;
-            tab.classList.toggle('is-active', selected);
-            tab.setAttribute('aria-pressed', String(selected));
-        });
-        // 두 영역 모두 레이아웃에 참여시키고 비활성 영역만 가려 카드 높이를 유지합니다.
-        // 클릭할 수 있는 사용처 태그는 선택된 탭에서만 활성화합니다.
-        for (const [panel, selected] of [
-            [slotEl.querySelector('.d-reason-wrap'), activeView === 'usage'],
-            [slotEl.querySelector('.d-recipe-wrap'), activeView === 'recipe']
-        ]) {
-            if (!panel) continue;
-            panel.setAttribute('aria-hidden', String(!selected));
-            panel.inert = !selected;
-        }
-        renderHiddenboardRecipe(slotEl, calcResult);
-    }
-
-    function returnHiddenboardControlsToHeader() {
-        const actions = getEl('hiddenboardGlobalActions') || document.querySelector('.hiddenboard-ph-btns');
-        const mobileHost = getEl('boardMobileHeader');
-        if (!actions || !mobileHost) return;
-        if (actions.parentElement !== mobileHost) mobileHost.appendChild(actions);
-        actions.classList.remove('hiddenboard-actions-in-group');
-        actions.classList.add('hiddenboard-actions-in-header');
-    }
-
-    function placeHiddenboardControls() {
-        const actions = getEl('hiddenboardGlobalActions') || document.querySelector('.hiddenboard-ph-btns');
-        const mobileHost = getEl('boardMobileHeader');
-        const desktopHost = getEl('group-target-actions');
-        if (!actions || !mobileHost) return;
-        const useMobileHeader = window.matchMedia('(max-width: 767px)').matches || !desktopHost;
-        if (useMobileHeader) {
-            if (actions.parentElement !== mobileHost) mobileHost.appendChild(actions);
-            actions.classList.remove('hiddenboard-actions-in-group');
-            actions.classList.add('hiddenboard-actions-in-header');
-        } else {
-            if (actions.parentElement !== desktopHost) desktopHost.insertBefore(actions, desktopHost.firstChild);
-            actions.classList.remove('hiddenboard-actions-in-header');
-            actions.classList.add('hiddenboard-actions-in-group');
-        }
-    }
-
-    function wrapHiddenboardGridPages(grid, pageSize, onlyVisible = false) {
-        if (!grid) return;
-        const items = Array.from(grid.children).filter(el =>
-            el.classList.contains('hiddenboard-slot') && (!onlyVisible || el.style.display !== 'none')
-        );
-        if (items.length === 0) return;
-        const size = Math.max(1, pageSize || items.length);
-        const frag = document.createDocumentFragment();
-        for (let i = 0; i < items.length; i += size) {
-            const page = document.createElement('div');
-            page.className = 'hiddenboard-page';
-            items.slice(i, i + size).forEach(el => page.appendChild(el));
-            frag.appendChild(page);
-        }
-        grid.appendChild(frag);
-    }
-
-    // 조합 진행도 차감을 적용한 사용처 수량: 화면 표시 전용 계산.
-    function getHiddenboardReasonDisplayEntries(slotId, rMap, reqMap) {
-        const getReasonParentNeed = (info) => {
-            if (!info?.parentUid) return 0;
-            return Math.max(0, reqMap.get(info.parentUid) || 0);
-        };
-        const getReasonBaseQty = (rId, info) => {
-            if (!info || info.depth === 0 || !info.reqQty) return 0;
-            const parentNeed = getReasonParentNeed(info);
-            if (parentNeed <= 0) return 0;
-            return rId.startsWith('TOOL_') ? 1 : (info.reqQty || 1) * parentNeed;
-        };
-        if (!rMap) return [];
-        const entries = [...rMap.entries()].map(([rId, info], index) => ({
-            rId,
-            info,
-            index,
-            baseQty: getReasonBaseQty(rId, info),
-            displayQty: info?.depth === 0 ? 0 : getReasonBaseQty(rId, info)
-        }));
-        let remainingCompleted = Math.max(0, completedUnits.get(slotId) || 0);
-        entries
-            .filter(entry => entry.baseQty > 0)
-            .sort((a, b) => a.baseQty - b.baseQty || a.index - b.index)
-            .forEach(entry => {
-                if (remainingCompleted <= 0) return;
-                const consumed = Math.min(entry.displayQty, remainingCompleted);
-                entry.displayQty -= consumed;
-                remainingCompleted -= consumed;
-            });
-        return entries
-            .filter(entry => entry.info?.depth === 0 || entry.displayQty > 0)
-            .map(entry => [entry.rId, { ...entry.info, displayQty: entry.displayQty, _reasonOrder: entry.index }]);
-    }
-
-    // 카드 사용처·조합 조건 표시는 재료 배치/완료 상태 변경과 분리한다.
-    function renderHiddenboardSlotReasons({ id, slotEl, needed, isTarget, isMergedSlot, reasonMap, getCachedReasonEntries, targetHighlight, highlightDeps }) {
-        const getReasonTagClass = (info) => info?.tagClass || DEFAULT_REASON_TAG_CLASS;
-        const isSplitReason = (info) => info?.depth !== 0 && !!info?.reasonCenterHtml;
-        const renderReasonTagContent = (info) => {
-            if (!isSplitReason(info)) return info.text;
-            return [
-                `<span class="d-reason-grade">${escapeHtml(info.reasonGrade || '')}</span>`,
-                `<span class="d-reason-main">${info.reasonCenterHtml}</span>`,
-                `<span class="d-reason-qty">×${info.displayQty}</span>`
-            ].join('');
-        };
-        
-        const rCon = slotEl.querySelector(`#d-reason-${id}`);
-        if (rCon) {
-            const rMap = reasonMap.get(id);
-            if (rMap && rMap.size > 0 && needed > 0) {
-                let allEntries = getCachedReasonEntries(id, rMap).filter(([, info]) => info.depth !== 0);
-                if (isTarget && !isMergedSlot) allEntries = [];
-                if (_currentHighlight) {
-                    const filtered = allEntries.filter(([, i]) =>
-                        i.parentUid === targetHighlight ||
-                        (highlightDeps && highlightDeps.has(i.parentUid))
-                    );
-                    if (filtered.length > 0) allEntries = filtered;
-                }
-                if (allEntries.length > 0) {
-                    const sorted = allEntries.sort((a, b) =>
-                        (a[1].depth || 0) - (b[1].depth || 0) ||
-                        (a[1].reasonGradeRank ?? REASON_GRADE_ORDER.length) - (b[1].reasonGradeRank ?? REASON_GRADE_ORDER.length) ||
-                        (a[1]._reasonOrder || 0) - (b[1]._reasonOrder || 0)
-                    );
-                    rCon.classList.toggle('is-target-only', sorted.every(([, info]) => info.depth === 0));
-                    const unit = unitMap.get(id);
-                    const titleColor = SYSTEM_CONFIG.grades.colors[unit?.grade] || 'var(--accent)';
-                    const usageTitle = `<div class="d-detail-title" style="color:${titleColor}"><span>${escapeHtml(unit?.name || id)} 사용처</span><span class="d-recipe-count">(클릭 시 목표추적)</span></div>`;
-                    rCon.innerHTML = usageTitle + sorted.map(([rId, info]) => {
-                        const splitTagClass = isSplitReason(info) ? ' is-split-reason' : '';
-                        return `<button type="button" class="d-reason-tag ${getReasonTagClass(info)}${splitTagClass}" data-action="toggleHighlight" data-uid="${rId.replace(/^(TARGET_|MAT_|TOOL_|AUTO_)/,'')}">${renderReasonTagContent(info)}</button>`;
-                    }).join('');
-                } else {
-                    rCon.classList.remove('is-target-only');
-                    rCon.innerHTML = '';
-                }
-            } else {
-                rCon.classList.remove('is-target-only');
-                rCon.innerHTML = '';
-            }
-        }
-
-        const cEl = slotEl.querySelector(`#d-cond-${id}`);
-        if (cEl) {
-            let rMap = reasonMap.get(id);
-            const condMap = new Map();
-
-            if (rMap) {
-                getCachedReasonEntries(id, rMap).forEach(([, info]) => {
-                    if (!info.cond || info.displayQty <= 0) return;
-                    if (_currentHighlight) {
-                        const pUid = info.parentUid;
-                        if (pUid !== targetHighlight && (!highlightDeps || !highlightDeps.has(pUid))) return;
-                    }
-                    const cleanCond = formatConditionText(info.cond);
-                    if (!cleanCond) return;
-                    condMap.set(cleanCond, (condMap.get(cleanCond) || 0) + info.displayQty);
-                });
-            }
-
-            if (condMap.size > 0) {
-                cEl.style.display = 'flex';
-                cEl.innerHTML = '<span class="recipe-label">조합 조건</span>' +
-                    Array.from(condMap, ([condStr, qty]) => `<div class="d-condition-row"><span class="d-cond-text">${escapeHtml(condStr)}</span><span class="d-cond-qty">${qty}개</span></div>`).join('');
-            } else {
-                cEl.style.display = 'none';
-                cEl.innerHTML = '';
-            }
-        }
-    }
-
-    // 루트 목표로부터의 조합 깊이는 히든보드 배치에만 사용한다.
-    function getHiddenboardDepths(mergedSlots) {
-        const exactDepths = new Map();
-        let queue = [];
-        activeUnits.forEach((_, uid) => {
-            if (!mergedSlots.has(uid)) {
-                exactDepths.set(uid, 0);
-                queue.push(uid);
-            }
-        });
-        if (queue.length === 0) {
-            activeUnits.forEach((_, uid) => {
-                exactDepths.set(uid, 0);
-                queue.push(uid);
-            });
-        }
-        let curDepth = 0;
-        while(queue.length > 0 && curDepth < 30) {
-            let nextQueue = [];
-            curDepth++;
-            for (let uid of queue) {
-                const u = unitMap.get(uid);
-                if (!u) continue;
-                u.parsedRecipe?.forEach(pr => {
-                    if (pr.id && !exactDepths.has(pr.id)) {
-                        exactDepths.set(pr.id, curDepth);
-                        nextQueue.push(pr.id);
-                    }
-                });
-                getToolNeed(uid).forEach(toolId => {
-                    if (toolId && !exactDepths.has(toolId)) {
-                        exactDepths.set(toolId, curDepth);
-                        nextQueue.push(toolId);
-                    }
-                });
-                u.parsedCost?.forEach(pc => {
-                    if (AUTO_COST_SLOT_SET.has(pc.key) && !exactDepths.has(pc.key)) {
-                        exactDepths.set(pc.key, curDepth);
-                        nextQueue.push(pc.key);
-                    }
-                });
-            }
-            queue = nextQueue;
-        }
-
-        return exactDepths;
-    }
-
-    function sortHiddenboardGrids(grids) {
-        [grids.target, grids.special, grids.upperHidden, grids.basicHidden].forEach(grid => {
-            if (!grid) return;
-            const children = Array.from(grid.children);
-            children.sort((a, b) => {
-                const uidA = a.dataset.uid || a.id.replace('d-slot-wrap-','');
-                const uidB = b.dataset.uid || b.id.replace('d-slot-wrap-','');
-                const uA = unitMap.get(uidA);
-                const uB = unitMap.get(uidB);
-                if (grid === grids.upperHidden) {
-                    const levelDiff = (_unitNativeLevels.get(uidB) || 1) - (_unitNativeLevels.get(uidA) || 1);
-                    if (levelDiff !== 0) return levelDiff;
-                }
-                return getGradeIndex(uB?.grade) - getGradeIndex(uA?.grade) ||
-                       (SYSTEM_CONFIG.sorting.order[uB?.name]||0) - (SYSTEM_CONFIG.sorting.order[uA?.name]||0) ||
-                       (uA?.name || uidA).localeCompare(uB?.name || uidB);
-            });
-            children.forEach(el => grid.appendChild(el));
-        });
-    }
-
-    function updateHiddenboardGroupVisibility(grids, targetHighlight, excludeGridIds) {
-        Object.values(grids).forEach(g => {
-            if (!g) return;
-            const grp = g.closest('.hiddenboard-group'), icon = grp?.querySelector('.grp-toggle-icon');
-            if (!grp) return;
-            
-            const slots = Array.from(g.querySelectorAll('.hiddenboard-slot'));
-            const visibleSlots = slots.filter(el => el.style.display !== 'none');
-
-            if (targetHighlight) {
-                grp.style.display = visibleSlots.length > 0 ? 'block' : 'none';
-                if (visibleSlots.length > 0) {
-                    grp.classList.remove('collapsed');
-                    g.style.display = 'grid';
-                    if (icon) icon.style.transform = 'rotate(0deg)';
-                }
-            } else if (visibleSlots.length === 0 && grp.dataset.alwaysShow !== 'true') {
-                grp.style.display = 'block';
-                g.style.display = 'none'; grp.classList.add('collapsed'); if (icon) icon.style.transform = 'rotate(-90deg)';
-            }
-            else {
-                grp.style.display = 'block';
-                if (visibleSlots.length > 0 && grp.dataset.alwaysOpen === 'true') {
-                    grp.classList.remove('collapsed'); g.style.display = 'grid'; if (icon) icon.style.transform = 'rotate(0deg)';
-                }
-            }
-
-            const badge = getEl(`grp-count-${g.id}`);
-            if (!badge) return;
-            const countBase = excludeGridIds.includes(g.id) ? slots : visibleSlots;
-            const total = countBase.length;
-            const done = countBase.filter(el => el.classList.contains('is-completed')).length;
-            badge.textContent = total > 0 ? `${done} / ${total}` : '';
-        });
-    }
-
-    function restoreHiddenboardGroupState(targetHighlight) {
-        if (!targetHighlight && _highlightGroupState) {
-            _highlightGroupState.forEach((state, groupId) => {
-                const grp = getEl(groupId), grid = grp?.querySelector('.hiddenboard-grid');
-                if (!grp || !grid) return;
-                grp.classList.toggle('collapsed', state.collapsed);
-                grid.style.display = state.gridDisplay;
-                const icon = grp.querySelector('.grp-toggle-icon');
-                if (icon) icon.style.transform = state.collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
-            });
-            _highlightGroupState = null;
-        }
-    }
-
-    function updateHiddenboard(calcResult) {
-        if (!_isHiddenboardRendered) return;
-        const { reqMap, baseMap, reasonMap } = calcResult || calculateBoardRequirements();
-        const mergedSlots = new Set();
-
-        const targetHighlight = _currentHighlight || null;
-        const highlightDeps = targetHighlight ? getDependencies(targetHighlight) : null;
-        getEl('boardContent')?.classList.toggle('highlight-mode', !!targetHighlight);
-        
-        activeUnits.forEach((_, uid) => unitMap.get(uid)?.parsedRecipe?.forEach(pr => pr.id && activeUnits.has(pr.id) && mergedSlots.add(pr.id)));
-        const directMaterials = new Set();
-        activeUnits.forEach((_, uid) => { if (mergedSlots.has(uid)) return; unitMap.get(uid)?.parsedRecipe?.forEach(pr => pr.id && !activeUnits.has(pr.id) && directMaterials.add(pr.id)); });
-        const excludeGridIds = (() => { try { return JSON.parse(getEl('boardContent')?.dataset.excludeGridIds || '[]'); } catch { return []; } })();
-        const pool = getEl('hiddenboard-slot-pool');
-        
-        const grids = {
-            target: getEl('grid-target'),
-            special: getEl('grid-special'),
-            upperHidden: getEl('grid-upper-hidden'),
-            basicHidden: getEl('grid-basic-hidden')
-        };
-        const restoreLevelsByGridId = {
-            'grid-basic-hidden': 2,
-            'grid-upper-hidden': 3,
-            'grid-special': 4,
-            'grid-target': 5
-        };
-        _unitRestoreLevels.clear();
-
-        const exactDepths = getHiddenboardDepths(mergedSlots);
-
-        _hiddenboardSlotElsByUid.forEach(el => {
-            el.style.display = 'none'; el.classList.remove('is-visible','has-target','is-completed','highlighted-tree');
-            if (pool && el.parentElement !== pool) pool.appendChild(el);
-        });
-        getEl('boardContent')?.querySelectorAll('.hiddenboard-page').forEach(el => el.remove());
-        const gridFragments = new Map(Object.values(grids).filter(Boolean).map(grid => [grid, document.createDocumentFragment()]));
-        const reasonEntriesCache = new Map();
-        const getCachedReasonEntries = (slotId, rMap) => {
-            if (!reasonEntriesCache.has(slotId)) reasonEntriesCache.set(slotId, getHiddenboardReasonDisplayEntries(slotId, rMap, reqMap));
-            return reasonEntriesCache.get(slotId);
-        };
-
-        const visibleMaterialIds = new Set([...baseMap.keys(), ...reqMap.keys()]);
-
-        const processSlot = (id) => {
-            const slotEl = _hiddenboardSlotElsByUid.get(id); if (!slotEl) return null;
-            
-            const isAutoCost = AUTO_COST_SLOT_SET.has(id);
-            if (isAutoCost) return null;
-            
-            const isTarget = activeUnits.has(id);
-            const isCompletedTarget = !isTarget && !isAutoCost && completedTargets.has(id);
-            const isMergedSlot = isTarget && !isAutoCost && mergedSlots.has(id);
-            
-            let needed = reqMap.get(id) || 0;
-            if (isMergedSlot) needed = Math.max(0, (baseMap.get(id)||0) - (completedUnits.get(id)||0));
-            else if (isTarget && !isAutoCost) needed = Math.max(0, (activeUnits.get(id)||1) - (completedUnits.get(id)||0));
-            if (isCompletedTarget) needed = 0;
-            
-            const baseNeeded = isTarget ? (isMergedSlot ? (baseMap.get(id)||0) : (activeUnits.get(id)||1)) :
-                             isCompletedTarget ? (completedTargets.get(id)||1) :
-                             (baseMap.get(id)||0);
-
-            if (!baseNeeded && !isTarget && !isCompletedTarget) return null;
-
-            renderHiddenboardSlotReasons({
-                id, slotEl, needed, isTarget, isMergedSlot, reasonMap,
-                getCachedReasonEntries, targetHighlight, highlightDeps
-            });
-
-            const isCompleted = needed === 0;
-            slotEl.classList.toggle('has-target', !isCompleted);
-            slotEl.classList.toggle('is-completed', isCompleted);
-
-            let tGrid = null;
-
-            const uGrade = unitMap.get(id)?.grade;
-            const isHiddenGroup = getGradeIndex(uGrade) >= getGradeIndex(SYSTEM_CONFIG.policy.hiddenGroupMinGrade || "히든");
-            const depthInTree = exactDepths.has(id) ? exactDepths.get(id) : 99;
-            
-            const nativeLevel = isHiddenGroup ? (depthInTree <= 2 ? 3 : 2) : 1;
-            _unitNativeLevels.set(id, nativeLevel);
-            
-            let upgradedGrid = null;
-            
-            if (isCompletedTarget) upgradedGrid = grids.target;
-            else if (isMergedSlot) upgradedGrid = grids.special;
-            else if (isTarget) upgradedGrid = grids.target;
-            else if (directMaterials.has(id)) upgradedGrid = grids.special;
-            else {
-                const rVals = reasonMap.get(id);
-                if (rVals) {
-                    for (const i of rVals.values()) {
-                        if (i.depth === 1) { upgradedGrid = grids.special; break; }
-                    }
-                }
-            }
-            
-            let nativeGrid = null;
-            if (isHiddenGroup) nativeGrid = grids.upperHidden;
-            else if (isBasicHiddenboardGrade(uGrade)) nativeGrid = grids.basicHidden;
-            tGrid = upgradedGrid || nativeGrid;
-            if (!tGrid) return null;
-
-            const isFinalGoal = tGrid === grids.target;
-            slotEl.classList.toggle('is-final-goal', isFinalGoal);
-            if (isFinalGoal) renderHiddenboardRecipe(slotEl, calcResult);
-            else switchHiddenboardDetail(id, slotEl.dataset.detailView, calcResult);
-            const cWrap = slotEl.querySelector(`#craft-wrap-${id}`);
-            if (cWrap) {
-                if (!isCompleted) {
-                    const tenDisabled = needed >= 10 ? '' : ' disabled';
-                    const qtyButtons = isFinalGoal ? '' : `<button type="button" class="pc-btn" data-action="addComplete" data-uid="${id}" data-batch="1"><span class="batch-plus" aria-hidden="true">+</span>1개</button><button type="button" class="pc-btn" data-action="addComplete" data-uid="${id}" data-batch="10"${tenDisabled}><span class="batch-plus" aria-hidden="true">+</span>10개</button>`;
-                    cWrap.innerHTML = `<div class="craft-wrap-left"><span class="req-text">${needed}</span><span class="req-label">개</span></div><div class="craft-wrap-right">${qtyButtons}<button type="button" class="btn-complete" data-action="completeUnit" data-uid="${id}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m5 12 4 4 10-10"/></svg>완료</button></div>`;
-                } else cWrap.innerHTML = `<div class="craft-wrap-left"><span class="req-text">0</span><span class="req-label">개</span></div><div class="craft-wrap-right"><span class="complete-done-label">완료됨</span></div>`;
-            }
-
-            const targetBadge = slotEl.querySelector('.d-target-badge');
-            if (targetBadge) {
-                const isTracking = isFinalGoal && targetHighlight === id;
-                slotEl.querySelector('.d-final-goal-tag').hidden = !isFinalGoal;
-                targetBadge.hidden = !isFinalGoal;
-                targetBadge.classList.toggle('is-tracking', isTracking);
-                targetBadge.setAttribute('aria-pressed', String(isTracking));
-                targetBadge.textContent = isTracking ? '추적 해제' : '목표추적';
-                targetBadge.title = isTracking ? '목표 재료 추적 해제' : '직속 재료부터 기초 재료까지 목표추적';
-            }
-
-            const gridId = tGrid?.id || '';
-            _unitRestoreLevels.set(id, restoreLevelsByGridId[gridId] || 0);
-            const keepCompletedVisible = excludeGridIds.includes(gridId);
-            // 목표 추적 시 다른 유닛은 숨기지 않고 흐리게 표시합니다.
-            // 완료 숨기기는 별도 사용자 설정이므로 기존 동작을 유지합니다.
-            const hideT = _hideCompleted && isCompleted && !keepCompletedVisible;
-            if (tGrid) {
-                if (!hideT) {
-                    slotEl.classList.add('is-visible');
-                } else {
-                    slotEl.classList.remove('is-visible');
-                }
-                slotEl.style.display = hideT ? 'none' : 'flex';
-                (gridFragments.get(tGrid) || tGrid).appendChild(slotEl);
-            }
-
-            
-            return tGrid;
-        };
-
-        getUnitsFromIds(activeUnits.keys()).sort(compareUnitByHiddenboardPriority).forEach(u => processSlot(u.id));
-        getUnitsFromIds(completedTargets.keys()).sort(compareUnitByGradeName).forEach(u => processSlot(u.id));
-
-        getUnitsFromIds(Array.from(visibleMaterialIds)
-            .filter(uid => !AUTO_COST_SLOT_SET.has(uid) && !activeUnits.has(uid) && !completedTargets.has(uid)))
-            .sort(compareUnitByHiddenboardPriority)
-            .forEach(u => processSlot(u.id));
-
-        gridFragments.forEach((frag, grid) => { if (frag.childNodes.length > 0) grid.appendChild(frag); });
-
-        sortHiddenboardGrids(grids);
-
-        Object.values(grids).forEach(g => wrapHiddenboardGridPages(g, 6, !!targetHighlight));
-
-        updateHiddenboardGroupVisibility(grids, targetHighlight, excludeGridIds);
-
-        restoreHiddenboardGroupState(targetHighlight);
-
-        _hiddenboardSlotElsByUid.forEach((el, cleanId) => {
-            el.classList.toggle('highlighted-tree', !!_currentHighlight && highlightDeps?.has(cleanId));
-        });
-        updateGroupRestoreButtons();
-    }
+    /* 히든보드 전용 구현은 hiddenboard.js */
+    let returnHiddenboardControlsToHeader, renderHiddenboard, switchHiddenboardDetail, placeHiddenboardControls, updateHiddenboard;
 
     /* ==========================================================================
-       09. 히든보드 자동 완료
+       09. 재료보드·히든보드 자동 완료
        ========================================================================== */
+
+
+    /* 재료보드 전용 구현은 invenboard.js */
+    let completeInvenboardTargetsIfReady, updateInvenboard, toggleInvenboardSlotMode, resetInvenboardAmounts, toggleInvenboardInputMode, completeAllInvenboardUnits, getInvenboardAtoms, renderInvenboard, setInvenboardAmount, changeInvenboardAmount, calculateInvenboardCostboardTotals;
 
     function getBoardDependencyDepths(source = activeUnits) {
         const depths = new Map();
@@ -1915,10 +1419,11 @@
         return depths;
     }
 
-    function addCompletedMaterialUnit(uid, qty) {
+    function addCompletedMaterialUnit(uid, qty, { trackInvenboard = false } = {}) {
         const amount = Math.max(0, parseInt(qty, 10) || 0);
         if (amount <= 0) return;
         completedUnits.set(uid, Math.max(0, completedUnits.get(uid) || 0) + amount);
+        if (trackInvenboard) addInvenboardAutoCompletedUnit(uid, amount);
     }
 
 
@@ -1940,75 +1445,9 @@
         return hasRequirement ? Math.max(0, readyQty) : 0;
     }
 
-    function getHiddenboardRecipeCompletionCandidates(baseMap) {
-        const depths = getBoardDependencyDepths();
-        const candidates = new Map();
 
-        const addCandidate = (uid, qty) => {
-            const requiredQty = Math.max(0, parseInt(qty, 10) || 0);
-            if (requiredQty <= 0 || !unitMap.has(uid) || completedTargets.has(uid)) return;
-            const depth = depths.has(uid) ? depths.get(uid) : (activeUnits.has(uid) ? 0 : -1);
-            if (depth < 0) return;
-            candidates.set(uid, { unit: unitMap.get(uid), qty: requiredQty, depth });
-        };
-
-        baseMap.forEach((qty, uid) => addCandidate(uid, qty));
-        activeUnits.forEach((qty, uid) => addCandidate(uid, qty));
-
-        return [...candidates.values()].sort((a, b) =>
-            b.depth - a.depth ||
-            getGradeIndex(a.unit.grade) - getGradeIndex(b.unit.grade) ||
-            a.unit.name.localeCompare(b.unit.name)
-        );
-    }
-
-    function completeHiddenboardRecipeUnitsIfReady() {
-        if (_currentViewMode !== 'hiddenboard' || activeUnits.size === 0) return false;
-
-        let changed = false;
-        for (let pass = 0; pass < APP_INTERNAL.maxAutoCompletePasses && activeUnits.size > 0; pass++) {
-            const activeSizeBefore = activeUnits.size;
-            const { baseMap } = calculateBoardRequirements();
-            const candidates = getHiddenboardRecipeCompletionCandidates(baseMap);
-            let completedThisPass = false;
-
-            for (const { unit, qty: requiredQty } of candidates) {
-                const uid = unit.id;
-                const currentCompleted = Math.max(0, parseInt(completedUnits.get(uid), 10) || 0);
-                const targetQty = activeUnits.has(uid) ? (activeUnits.get(uid) || 1) : requiredQty;
-                const remainingQty = Math.max(0, targetQty - currentCompleted);
-                if (remainingQty <= 0) continue;
-
-                const readyQty = getCompletedRecipeReadyQty(uid, remainingQty);
-                if (readyQty <= 0) continue;
-
-                deleteCompletedRecipe(uid, readyQty);
-                if (activeUnits.has(uid)) {
-                    const activeQty = activeUnits.get(uid) || 1;
-                    const nextCompleted = currentCompleted + readyQty;
-                    if (nextCompleted >= activeQty) {
-                        completedTargets.set(uid, activeQty);
-                        activeUnits.delete(uid);
-                        pausedUnits.delete(uid);
-                        completedUnits.delete(uid);
-                                    } else {
-                        completedUnits.set(uid, nextCompleted);
-                    }
-                } else {
-                    addCompletedMaterialUnit(uid, readyQty);
-                }
-
-                completedThisPass = changed = true;
-                if (activeUnits.size !== activeSizeBefore) break;
-            }
-
-            if (!completedThisPass || activeUnits.size === activeSizeBefore) break;
-        }
-
-        if (!changed) return false;
-        _currentHighlight = null;
-        return true;
-    }
+    /* 히든보드 전용 구현은 hiddenboard.js */
+    let completeHiddenboardRecipeUnitsIfReady;
 
     /* ==========================================================================
        10. 유닛 도감·즐겨찾기
@@ -2131,9 +1570,9 @@
     }
 
     function getUnitboardSort(a, b) {
-        return (SYSTEM_CONFIG.sorting.order[b.name] || 0) - (SYSTEM_CONFIG.sorting.order[a.name] || 0) ||
+        return getGradeIndex(b.grade) - getGradeIndex(a.grade) ||
+            (SYSTEM_CONFIG.sorting.order[b.name] || 0) - (SYSTEM_CONFIG.sorting.order[a.name] || 0) ||
             (isOneTime(a) ? -1 : isOneTime(b) ? 1 : 0) ||
-            getGradeIndex(b.grade) - getGradeIndex(a.grade) ||
             calculateTotalCostScore(b) - calculateTotalCostScore(a) ||
             a.name.localeCompare(b.name);
     }
@@ -2511,6 +1950,10 @@
        12. 화면 전환·보드 조정
        ========================================================================== */
 
+
+    /* 재료보드 PC 가로 화면 판정·탭 관리 구현은 responsive.js */
+    let syncInvenboardNav, isDesktopInvenboardSupported;
+
     const getNexusVersion = () => window.APP_VERSION || window.NEXUS_BUILD_VERSION || '';
     const NEXUS_TITLE_TEXT = Object.freeze({
         main: { value: '개복디 넥서스' },
@@ -2588,9 +2031,20 @@
     }
 
 
-    function updateBoardPanel(calcResult) {
+    function updateBoardPanel(calcResult, invenboardTotals = null) {
         updateBoardHeader();
         let autoCompleted = false;
+        if (_currentViewMode === 'invenboard') {
+            if (!_isInvenboardRendered) renderInvenboard();
+            if (!_isInvenboardRendered) return autoCompleted;
+            if (completeInvenboardTargetsIfReady()) {
+                calcResult = calculateBoardRequirements();
+                invenboardTotals = calculateInvenboardCostboardTotals();
+                autoCompleted = true;
+            }
+            updateInvenboard(invenboardTotals || calculateInvenboardCostboardTotals());
+            return autoCompleted;
+        }
         if (_currentViewMode === 'hiddenboard') {
             if (!_isHiddenboardRendered) renderHiddenboard();
             if (!_isHiddenboardRendered) return autoCompleted;
@@ -2600,6 +2054,7 @@
             }
             updateHiddenboard(calcResult || _lastCalcResult || calculateBoardRequirements());
             updateEmptyMsg();
+            return autoCompleted;
         }
         return autoCompleted;
     }
@@ -2668,6 +2123,7 @@
 
     /* 화면 전환 */
     function setupInitialView() {
+        syncInvenboardNav();
         switchLayout('unitboard');
     }
 
@@ -2675,22 +2131,26 @@
         hideRecipeTooltip();
         const layout = getEl('mainLayout');
         if (!layout) return;
-        const nextMode = ['unitboard', 'hiddenboard'].includes(mode) ? mode : 'unitboard';
+        const nextMode = mode === 'invenboard' && !isDesktopInvenboardSupported()
+            ? 'unitboard'
+            : ['unitboard', 'hiddenboard', 'invenboard'].includes(mode) ? mode : 'unitboard';
         _currentViewMode = nextMode;
         const viewMeta = {
             unitboard: ['유닛도감', 'UNIT ARCHIVE', '목표를 고르세요. 완성까지 필요한 모든 조합을 연결합니다.'],
-            hiddenboard: ['히든보드', 'COMBINATION BOARD', '목표부터 기본 재료까지, 조합의 흐름을 한눈에 확인하세요.']
+            hiddenboard: ['히든보드', 'COMBINATION BOARD', '목표부터 기본 재료까지, 조합의 흐름을 한눈에 확인하세요.'],
+            invenboard: ['재료 보드', 'MATERIAL INVENTORY', '보유 재료와 완성 진행도를 관리합니다.']
         }[nextMode];
         const title = getEl('workspaceTitle'), breadcrumb = getEl('workspaceBreadcrumb'), description = getEl('workspaceDescription');
         if (title) title.innerHTML = `${viewMeta[0]}<span class="heading-dot">.</span>`;
         if (breadcrumb) breadcrumb.textContent = viewMeta[1];
         if (description) description.textContent = viewMeta[2];
-        layout.classList.remove('view-unitboard', 'view-hiddenboard');
+        layout.classList.remove('view-unitboard', 'view-hiddenboard', 'view-invenboard');
         layout.classList.add(`view-${nextMode}`);
 
         const buttons = {
             unitboard: getEl('btnViewUnitboard'),
-            hiddenboard: getEl('btnViewHiddenboard')
+            hiddenboard: getEl('btnViewHiddenboard'),
+            invenboard: getEl('btnViewInvenboard')
         };
         Object.entries(buttons).forEach(([key, btn]) => {
             if (!btn) return;
@@ -2699,7 +2159,7 @@
             else btn.removeAttribute('aria-current');
         });
 
-        const autoCompleted = nextMode === 'hiddenboard' ? ensureActiveBoardRendered(_lastCalcResult) : false;
+        const autoCompleted = (nextMode === 'hiddenboard' || nextMode === 'invenboard') ? ensureActiveBoardRendered(_lastCalcResult) : false;
         updateBoardHeader();
         if (autoCompleted) refreshPanelsAfterBoardAutoComplete();
     }
@@ -2819,6 +2279,8 @@
         if ((pointerCardUid && card?.dataset.uid === pointerCardUid) || e.target.closest('.unit-card .uc-ctrl-area')) return;
         const actionEl = e.target.closest('[data-action]');
         if (!actionEl) {
+            const invenInput = e.target?.closest?.('.invenboard-input[data-inven-id]');
+            if (invenInput && !invenInput.readOnly && !invenInput.disabled) invenInput.select();
             if (_currentHighlight) toggleHighlight(null);
             if (getEl('recipeTooltip')?.classList.contains('active') && !e.target.closest('#recipeTooltip')) hideRecipeTooltip();
             return;
@@ -2827,6 +2289,13 @@
         const action = actionEl.dataset.action, uid = actionEl.dataset.uid;
         switch (action) {
             case 'switchMainView': switchLayout(actionEl.dataset.view); break;
+            case 'invenboardAdd':
+                    if (_invenboardInputMode === 'manual' && e.target?.closest?.('.invenboard-input')) break;
+                    e.stopPropagation(); changeInvenboardAmount(actionEl.dataset.invenId, parseInt(actionEl.dataset.delta || '1', 10)); break;
+            case 'toggleInvenboardInputMode': e.stopPropagation(); toggleInvenboardInputMode(); break;
+            case 'resetInvenboardAmounts': e.stopPropagation(); resetInvenboardAmounts(); break;
+            case 'completeAllInvenboardUnits': e.stopPropagation(); completeAllInvenboardUnits(); break;
+            case 'toggleInvenboardSlotMode': e.stopPropagation(); toggleInvenboardSlotMode(); break;
             case 'runPreset':
                 const idx = parseInt(actionEl.dataset.presetIdx, 10), preset = PRESETS[idx];
                 if (preset && !_presetUsed.get(idx)) {
@@ -2891,6 +2360,16 @@
         }
     });
 
+    document.addEventListener('input', e => {
+        const input = e.target?.closest?.('.invenboard-input[data-inven-id]');
+        if (!input || _invenboardInputMode !== 'manual') return;
+        setInvenboardAmount(input.dataset.invenId, input.value, { preserveOverflow: true });
+    });
+    document.addEventListener('focusin', e => {
+        const input = e.target?.closest?.('.invenboard-input[data-inven-id]');
+        if (input && !input.readOnly && !input.disabled) setTimeout(() => input.select(), 0);
+    });
+
     document.addEventListener('pointerdown', e => {
         _smartChangePointerCardUid = null;
         const actionEl = e.target.closest('[data-action="smartChange"]');
@@ -2936,91 +2415,131 @@
             if (document.activeElement === searchInp) searchInp?.blur();
         }
     });
-    function updatePivotColumns() {
-        const { width, height } = window.screen;
-        const pixelRatio = window.devicePixelRatio || 1;
-        const isPortraitDesktop = width < height && window.matchMedia('(hover:hover) and (pointer:fine)').matches;
-        const pixelWidth = width * pixelRatio;
-        const pixelHeight = height * pixelRatio;
-        const columns = isPortraitDesktop && pixelWidth >= 2159 && pixelHeight >= 3839 ? '4'
-            : isPortraitDesktop && pixelWidth >= 1439 && pixelHeight >= 2559 ? '3' : '';
-        document.documentElement.dataset.pivotColumns = columns;
-    }
-    const handleViewportChange = () => {
-        updatePivotColumns();
-        hideRecipeTooltip();
-        closeFontSizePopup();
-        placeHiddenboardControls();
-        updateBoardHeader();
-    };
-    window.addEventListener('orientationchange', handleViewportChange);
-    window.addEventListener('resize', handleViewportChange);
-    window.addEventListener('focus', updatePivotColumns);
 
-    /* 화면 스와이프 이벤트 */
-    function bindSwipeEvents() {
-        const sArea = getEl('tabContent');
-        if (sArea) {
-            let sX = 0, sY = 0, sPager = null;
-            const getSwipePager = target => {
-                const favPager = target?.closest?.('.unitboard-fav-grid');
-                if (favPager) return { el: favPager, type: 'favorite' };
-                const categoryPager = target?.closest?.('.unitboard-category-grid');
-                return categoryPager ? { el: categoryPager, type: 'category' } : null;
-            };
-            const canPagerMove = (pagerState, dX) => {
-                const pager = pagerState?.el;
-                if (!pager) return false;
-                const max = Math.max(0, pager.scrollWidth - pager.clientWidth);
-                if (max <= 2) return false;
-                const start = Math.max(0, Math.min(pagerState.scrollLeft, max));
-                if (dX < 0) return start < max - 2;
-                if (dX > 0) return start > 2;
-                return false;
-            };
-            sArea.addEventListener('touchstart', e => {
-                const touch = e.changedTouches[0];
-                sX = touch.screenX; sY = touch.screenY;
-                const pager = getSwipePager(e.target);
-                sPager = pager ? { ...pager, scrollLeft: pager.el.scrollLeft } : null;
-            }, { passive: true });
-            sArea.addEventListener('touchend', e => {
-                if (_isSwiping || _unitboardCollection) return;
-                let dX = e.changedTouches[0].screenX - sX, dY = e.changedTouches[0].screenY - sY;
-                if (Math.abs(dX) > 70 && Math.abs(dY) < 50) {
-                    if (sPager?.type === 'favorite') { sPager = null; return; }
-                    if (sPager?.type === 'category' && canPagerMove(sPager, dX)) { sPager = null; return; }
-                    _isSwiping = true;
-                    if (dX > 0 && _activeTabIdx > 0) selectTab(_activeTabIdx - 1);
-                    else if (dX < 0 && _activeTabIdx < SYSTEM_CONFIG.tabs.length - 1) selectTab(_activeTabIdx + 1);
-                    if (_swipeTimer) clearTimeout(_swipeTimer);
-                    _swipeTimer = setTimeout(() => _isSwiping = false, 300);
-                }
-                sPager = null;
-            }, { passive: true });
-        }
-        const dBoard = getEl('colRightPanel');
-        if (dBoard) {
-            let dX0 = 0, dY0 = 0, dPager = false;
-            dBoard.addEventListener('touchstart', e => {
-                dX0 = e.changedTouches[0].screenX;
-                dY0 = e.changedTouches[0].screenY;
-                dPager = !!e.target?.closest?.('.hiddenboard-grid');
-            }, { passive: true });
-            dBoard.addEventListener('touchend', e => {
-                const dx = e.changedTouches[0].screenX - dX0, dy = e.changedTouches[0].screenY - dY0;
-                if (Math.abs(dx) > 80 && Math.abs(dy) < 50) {
-                    if (dPager) { dPager = false; return; }
-                    if (dx > 0) switchLayout('unitboard'); else switchLayout('hiddenboard');
-                }
-                dPager = false;
-            }, { passive: true });
-        }
-    }
+    /* 화면 크기 감지·스와이프 이벤트 구현은 responsive.js */
+    let updatePivotColumns, bindSwipeEvents;
 
     /* ==========================================================================
        14. 앱 초기화
        ========================================================================== */
+    /* 기능별 모듈 연결: 공통 상태를 복제하지 않고 기존 app.js 스코프를 공유 */
+    const boardModuleContext = {
+        get ALL_INVENBOARD_SLOT_SET() { return ALL_INVENBOARD_SLOT_SET; },
+        get APP_INTERNAL() { return APP_INTERNAL; },
+        get AUTO_COST_SLOT_SET() { return AUTO_COST_SLOT_SET; },
+        get AUTO_RECIPE_REQUIREMENT_SET() { return AUTO_RECIPE_REQUIREMENT_SET; },
+        get CLEAN_SPECIAL_CONDITIONS() { return CLEAN_SPECIAL_CONDITIONS; },
+        get CLEAN_UNIT_QTY_CAPS() { return CLEAN_UNIT_QTY_CAPS; },
+        get COSTBOARD_ATOM_ID_SET() { return COSTBOARD_ATOM_ID_SET; },
+        get COSTBOARD_DISPLAY_SLOT_DEFS() { return COSTBOARD_DISPLAY_SLOT_DEFS; },
+        get DEFAULT_REASON_TAG_CLASS() { return DEFAULT_REASON_TAG_CLASS; },
+        get GROUP_DEFS() { return GROUP_DEFS; },
+        get INVENBOARD_ALL_ATOMS() { return INVENBOARD_ALL_ATOMS; },
+        get INVENBOARD_CORE_ATOMS() { return INVENBOARD_CORE_ATOMS; },
+        get INVENBOARD_CORE_CALC_ATOMS() { return INVENBOARD_CORE_CALC_ATOMS; },
+        get INVENBOARD_EXPANSION_SLOT_DEFS() { return INVENBOARD_EXPANSION_SLOT_DEFS; },
+        get INVENBOARD_INPUT_STEPS() { return INVENBOARD_INPUT_STEPS; },
+        get INVENBOARD_SLOT_SET() { return INVENBOARD_SLOT_SET; },
+        get REASON_GRADE_ORDER() { return REASON_GRADE_ORDER; },
+        get SYSTEM_CONFIG() { return SYSTEM_CONFIG; },
+        get VOID_RAY_ATOM() { return VOID_RAY_ATOM; },
+        get VOID_RAY_ID() { return VOID_RAY_ID; },
+        get _activeTabIdx() { return _activeTabIdx; },
+        set _activeTabIdx(value) { _activeTabIdx = value; },
+        get _completeLock() { return _completeLock; },
+        set _completeLock(value) { _completeLock = value; },
+        get _currentHighlight() { return _currentHighlight; },
+        set _currentHighlight(value) { _currentHighlight = value; },
+        get _currentViewMode() { return _currentViewMode; },
+        set _currentViewMode(value) { _currentViewMode = value; },
+        get _directInvenboardAtomNeedCache() { return _directInvenboardAtomNeedCache; },
+        get _hiddenboardSlotElsByUid() { return _hiddenboardSlotElsByUid; },
+        get _hideCompleted() { return _hideCompleted; },
+        set _hideCompleted(value) { _hideCompleted = value; },
+        get _highlightGroupState() { return _highlightGroupState; },
+        set _highlightGroupState(value) { _highlightGroupState = value; },
+        get _invenboardAutoCompletedUnits() { return _invenboardAutoCompletedUnits; },
+        get _invenboardInputMode() { return _invenboardInputMode; },
+        set _invenboardInputMode(value) { _invenboardInputMode = value; },
+        get _invenboardManualInputs() { return _invenboardManualInputs; },
+        get _isHiddenboardRendered() { return _isHiddenboardRendered; },
+        set _isHiddenboardRendered(value) { _isHiddenboardRendered = value; },
+        get _isInvenboardRendered() { return _isInvenboardRendered; },
+        set _isInvenboardRendered(value) { _isInvenboardRendered = value; },
+        get _isInvenboardSlotsExpanded() { return _isInvenboardSlotsExpanded; },
+        set _isInvenboardSlotsExpanded(value) { _isInvenboardSlotsExpanded = value; },
+        get _lastCalcResult() { return _lastCalcResult; },
+        set _lastCalcResult(value) { _lastCalcResult = value; },
+        get _presetUsed() { return _presetUsed; },
+        set _presetUsed(value) { _presetUsed = value; },
+        get _selectionResetRetainedCompleted() { return _selectionResetRetainedCompleted; },
+        get _unitNativeLevels() { return _unitNativeLevels; },
+        get _unitRestoreLevels() { return _unitRestoreLevels; },
+        get _unitboardCollection() { return _unitboardCollection; },
+        set _unitboardCollection(value) { _unitboardCollection = value; },
+        get activeUnits() { return activeUnits; },
+        get addCompletedMaterialUnit() { return addCompletedMaterialUnit; },
+        get calculateBoardRequirements() { return calculateBoardRequirements; },
+        get calculateCostboardAtomTotals() { return calculateCostboardAtomTotals; },
+        get clean() { return clean; },
+        get clearInvenboardManualInputs() { return clearInvenboardManualInputs; },
+        get closeFontSizePopup() { return closeFontSizePopup; },
+        get commitNexusStateChange() { return commitNexusStateChange; },
+        get compareUnitByGradeName() { return compareUnitByGradeName; },
+        get compareUnitByHiddenboardPriority() { return compareUnitByHiddenboardPriority; },
+        get completedTargets() { return completedTargets; },
+        get completedUnits() { return completedUnits; },
+        get deleteCompletedRecipe() { return deleteCompletedRecipe; },
+        get escapeHtml() { return escapeHtml; },
+        get formatConditionText() { return formatConditionText; },
+        get formatRecipe() { return formatRecipe; },
+        get getBoardDependencyDepths() { return getBoardDependencyDepths; },
+        get getCompletedRecipeReadyQty() { return getCompletedRecipeReadyQty; },
+        get getCostboardAtomRawName() { return getCostboardAtomRawName; },
+        get getCostboardDisplayName() { return getCostboardDisplayName; },
+        get getCostboardSlotToneClass() { return getCostboardSlotToneClass; },
+        get getDependencies() { return getDependencies; },
+        get getEl() { return getEl; },
+        get getGradeIndex() { return getGradeIndex; },
+        get getGroupRestoreIds() { return getGroupRestoreIds; },
+        get getInvenboardAtomGrade() { return getInvenboardAtomGrade; },
+        get getInvenboardAtomNameStyle() { return getInvenboardAtomNameStyle; },
+        get getInvenboardTrackedTargets() { return getInvenboardTrackedTargets; },
+        get getToolNeed() { return getToolNeed; },
+        get getUnitCardNotesHtml() { return getUnitCardNotesHtml; },
+        get getUnitQtyLimit() { return getUnitQtyLimit; },
+        get getUnitUnitboardEssenceText() { return getUnitUnitboardEssenceText; },
+        get getUnitsFromIds() { return getUnitsFromIds; },
+        get getUnitsFromMap() { return getUnitsFromMap; },
+        get hideRecipeTooltip() { return hideRecipeTooltip; },
+        get isAutoRecipeRequirementSatisfied() { return isAutoRecipeRequirementSatisfied; },
+        get isConditionOnlyRecipe() { return isConditionOnlyRecipe; },
+        get isInvenboardInstantCompleteUnit() { return isInvenboardInstantCompleteUnit; },
+        get isOneTime() { return isOneTime; },
+        get isToolRequirement() { return isToolRequirement; },
+        get limitCacheSize() { return limitCacheSize; },
+        get normalizeSavedId() { return normalizeSavedId; },
+        get normalizeUnitQty() { return normalizeUnitQty; },
+        get pausedUnits() { return pausedUnits; },
+        get placeHiddenboardControls() { return placeHiddenboardControls; },
+        get renderInvenboardGradeTag() { return renderInvenboardGradeTag; },
+        get resetCompletedMaterialsByLevel() { return resetCompletedMaterialsByLevel; },
+        get resetInvenboardAutoCompletedUnits() { return resetInvenboardAutoCompletedUnits; },
+        get resetInvenboardOwnedForUnit() { return resetInvenboardOwnedForUnit; },
+        get returnHiddenboardControlsToHeader() { return returnHiddenboardControlsToHeader; },
+        get selectTab() { return selectTab; },
+        get setActiveUnitQty() { return setActiveUnitQty; },
+        get showActionFeedback() { return showActionFeedback; },
+        get switchLayout() { return switchLayout; },
+        get titleToGridId() { return titleToGridId; },
+        get unitMap() { return unitMap; },
+        get updateBoardHeader() { return updateBoardHeader; },
+        get updatePresetBtns() { return updatePresetBtns; }
+    };
+    ({ completeHiddenboardRecipeUnitsIfReady, completeUnit, placeHiddenboardControls, renderHiddenboard, resetGroupCompleted, returnHiddenboardControlsToHeader, switchHiddenboardDetail, updateHiddenboard } = window.NEXUS_HIDDEN(boardModuleContext));
+    ({ calculateInvenboardCostboardTotals, changeInvenboardAmount, completeAllInvenboardUnits, completeInvenboardTargetsIfReady, getInvenboardAtoms, renderInvenboard, resetInvenboardAmounts, setInvenboardAmount, toggleInvenboardInputMode, toggleInvenboardSlotMode, updateInvenboard } = window.NEXUS_INVEN(boardModuleContext));
+    ({ bindSwipeEvents, isDesktopInvenboardSupported, syncInvenboardNav, updatePivotColumns } = window.NEXUS_RESPONSIVE(boardModuleContext));
+
 
     /* 부팅 상태 전달 */
     const markNexusAppReady = () => {

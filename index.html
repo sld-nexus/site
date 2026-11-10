@@ -3,7 +3,7 @@
 <head>
     <script>
         // 앱 표시 및 리소스 캐시 공통 버전
-        window.APP_VERSION = "sld-nexus-V38";
+        window.APP_VERSION = "sld-nexus-V39";
         window.NEXUS_BUILD_VERSION = window.APP_VERSION;
         if (new URLSearchParams(window.location.search).get('nexusStandalone') === 'build') {
             document.documentElement.classList.add('nexus-standalone-build');
@@ -136,14 +136,16 @@
                     return new Promise(function(resolve){document.addEventListener('DOMContentLoaded',resolve,{once:true});});
                 }
                 function waitForStyle(){
-                    var link=document.querySelector('link[data-boot-style]');
-                    if(!link) return Promise.reject(new Error('required stylesheet missing'));
-                    if(link.dataset.loadFailed==='1') return Promise.reject(new Error('required stylesheet failed'));
-                    if(link.sheet) return Promise.resolve();
-                    return new Promise(function(resolve,reject){
-                        link.addEventListener('load',resolve,{once:true});
-                        link.addEventListener('error',function(){reject(new Error('required stylesheet failed'));},{once:true});
-                    });
+                    var links=Array.from(document.querySelectorAll('link[data-boot-style]'));
+                    if(links.length!==3) return Promise.reject(new Error('required stylesheet missing'));
+                    return Promise.all(links.map(function(link){
+                        if(link.dataset.loadFailed==='1') return Promise.reject(new Error('required stylesheet failed'));
+                        if(link.sheet) return Promise.resolve();
+                        return new Promise(function(resolve,reject){
+                            link.addEventListener('load',resolve,{once:true});
+                            link.addEventListener('error',function(){reject(new Error('required stylesheet failed'));},{once:true});
+                        });
+                    }));
                 }
                 function waitForPageLoad(){
                     if(document.readyState==='complete') return Promise.resolve();
@@ -200,11 +202,11 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
-    <meta property="og:image" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-V38">
-    <meta property="og:image:secure_url" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-V38">
+    <meta property="og:image" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-V39">
+    <meta property="og:image:secure_url" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-V39">
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:alt" content="개복디 넥서스">
-    <meta name="twitter:image" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-V38">
+    <meta name="twitter:image" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-V39">
     <meta name="twitter:image:alt" content="개복디 넥서스">
     <meta name="description" content="유닛도감과 히든보드, 나의 조합의 필요 재료와 정수계산을 제공하는 개복디 넥서스">
     <meta property="og:type" content="website">
@@ -229,6 +231,13 @@
             stylesheet.dataset.bootStyle = '1';
             stylesheet.href = window.nexusAssetUrl('./style.css');
             document.head.appendChild(stylesheet);
+            ['hiddenboard.css','invenboard.css'].forEach(function(file){
+                var boardStyle = document.createElement('link');
+                boardStyle.rel = 'stylesheet';
+                boardStyle.dataset.bootStyle = '1';
+                boardStyle.href = window.nexusAssetUrl('./' + file);
+                document.head.appendChild(boardStyle);
+            });
         })();
     </script>
 <script id="headerControlLabels">
@@ -368,6 +377,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
         <nav class="gh-center" aria-label="주요 화면">
             <button type="button" id="btnViewUnitboard" class="gh-nav-btn active" data-action="switchMainView" data-view="unitboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="gh-nav-label">유닛도감</span></button>
             <button type="button" id="btnViewHiddenboard" class="gh-nav-btn" data-action="switchMainView" data-view="hiddenboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v5m-7 5V8h14v5M5 17v4m14-4v4"/><rect x="2" y="13" width="6" height="4" rx="1"/><rect x="16" y="13" width="6" height="4" rx="1"/><rect x="9" y="3" width="6" height="5" rx="1"/></svg><span class="gh-nav-label">히든보드</span></button>
+            <template id="invenboardNavTemplate"><button type="button" id="btnViewInvenboard" class="gh-nav-btn" data-action="switchMainView" data-view="invenboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/></svg><span class="gh-nav-label">재료보드</span></button></template>
         </nav>
         <div class="gh-right">
             <button type="button" id="btnBuildStandalone" class="gh-tool-btn" data-action="openBuildIndependentWindow" aria-label="조합·재료 독립 창" title="조합·재료 독립 창"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4" width="19" height="15" rx="2"/><rect x="11.5" y="11" width="7.5" height="5.5" rx="1"/></svg></button>
@@ -420,7 +430,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     <div id="recipeTooltip" class="recipe-tooltip" role="tooltip" aria-live="polite"></div>
 <script>
         (function(){
-            var files = ['data.js','config.js','app.js'];
+            var files = ['data.js','config.js','hiddenboard.js','invenboard.js','responsive.js','app.js'];
             function loadNext(index){
                 if(index >= files.length) return;
                 var src = files[index];
