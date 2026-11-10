@@ -156,10 +156,6 @@
         hapticDuration: 15,
         searchFailFeedbackDelay: 1500,
         completeLockDelay: 300,
-        appVersionDisplayMs: 1500,
-        titleMainDisplayMs: 5000,
-        titleCreatorDisplayMs: 3000,
-        titleTransitionMs: 180,
         accelInterval: 80,
         accelMinInterval: 20,
         accelDecreaseStep: 5,
@@ -252,7 +248,6 @@
     let _restoreAllPendingTimer = null;
     let _lastCalcResult = null;
     let _fontRepeatTimer = null, _fontRepeatDelayTimer = null;
-    let _titleRotationTimer = null, _titleTransitionTimer = null, _titleVersionTimer = null;
     
     let _presetTab = '일반 프리셋';
     let _fontScale = 1.0;
@@ -1954,76 +1949,12 @@
     /* 재료보드 PC 가로 화면 판정·탭 관리 구현은 responsive.js */
     let syncInvenboardNav, isDesktopInvenboardSupported;
 
-    const getNexusVersion = () => window.APP_VERSION || window.NEXUS_BUILD_VERSION || '';
-    const NEXUS_TITLE_TEXT = Object.freeze({
-        main: { value: '개복디 넥서스' },
-        creator: { label: '제작자', value: '회장 | 3-S2-1-2461127' }
-    });
-    const getNexusTitleViewMeta = mode => {
-        if (mode === 'version') {
-            return { label: '버전정보', value: getNexusVersion() };
-        }
-        return NEXUS_TITLE_TEXT[mode] || NEXUS_TITLE_TEXT.main;
-    };
-    const buildNexusTitleHtml = (mode, { label, value }) => {
-        if (mode === 'main') {
-            return `<span class="gh-title-mainline">${escapeHtml(value)}</span>`;
-        }
-        return `<span class="gh-title-stack">
-            <span class="gh-title-label">${escapeHtml(label)}</span>
-            <span class="gh-title-main">${escapeHtml(value)}</span>
-        </span>`;
-    };
-    const clearNexusTitleRotationTimers = () => {
-        clearTimeout(_titleRotationTimer);
-        clearTimeout(_titleTransitionTimer);
-        _titleRotationTimer = null;
-        _titleTransitionTimer = null;
-    };
-    const renderNexusTitleView = mode => {
-        const title = getEl('ghTitleText');
-        if (!title) return;
-        const meta = getNexusTitleViewMeta(mode);
-        const text = meta.label ? `${meta.label} ${meta.value}` : meta.value;
-        title.dataset.titleView = mode;
-        title.classList.toggle('is-version-view', mode === 'version');
-        title.innerHTML = buildNexusTitleHtml(mode, meta);
-        title.setAttribute('aria-label', `${text} · 앱 버전 보기`);
-    };
-    const scheduleNexusTitleRotation = mode => {
-        const delay = mode === 'creator' ? APP_INTERNAL.titleCreatorDisplayMs : APP_INTERNAL.titleMainDisplayMs;
-        _titleRotationTimer = setTimeout(() => {
-            const title = getEl('ghTitleText');
-            if (!title) return;
-            title.classList.add('is-transitioning');
-            _titleTransitionTimer = setTimeout(() => {
-                const nextMode = mode === 'creator' ? 'main' : 'creator';
-                renderNexusTitleView(nextMode);
-                title.classList.remove('is-transitioning');
-                scheduleNexusTitleRotation(nextMode);
-            }, APP_INTERNAL.titleTransitionMs);
-        }, delay);
-    };
-    const restartNexusTitleRotation = () => {
-        const title = getEl('ghTitleText');
-        if (!title) return;
-        clearNexusTitleRotationTimers();
-        title.classList.remove('is-transitioning');
-        renderNexusTitleView('main');
-        scheduleNexusTitleRotation('main');
-    };
-    const showNexusAppVersion = () => {
-        const title = getEl('ghTitleText');
-        const version = getNexusVersion();
-        if (!title || !version) return;
-        clearNexusTitleRotationTimers();
-        title.classList.remove('is-transitioning');
-        renderNexusTitleView('version');
-        clearTimeout(_titleVersionTimer);
-        _titleVersionTimer = setTimeout(() => {
-            _titleVersionTimer = null;
-            restartNexusTitleRotation();
-        }, APP_INTERNAL.appVersionDisplayMs);
+    const renderNexusHeaderVersion = () => {
+        const versionText = getEl('ghTitleVersion');
+        if (!versionText) return;
+        const buildVersion = String(window.APP_VERSION || window.NEXUS_BUILD_VERSION || '');
+        const shortVersion = buildVersion.match(/V\d+(?:\.\d+)*$/i)?.[0] || '';
+        versionText.textContent = shortVersion ? ` · ${shortVersion}` : '';
     };
     function updateBoardHeader() {
         const hiddenboardActions = getEl('hiddenboardGlobalActions');
@@ -2305,7 +2236,6 @@
                     updatePresetBtns();
                 }
                 break;
-            case 'showAppVersion': showNexusAppVersion(); break;
             case 'openBuildIndependentWindow': openBuildIndependentWindow(); break;
             case 'closeBuildStandaloneWindow': window.close(); break;
             case 'toggleFontSizePopup': toggleFontSizePopup(); break;
@@ -2395,11 +2325,6 @@
         if ((e.key === 'Enter' || e.key === ' ') && e.target?.matches?.('.unit-card[data-action="toggleUnit"]')) {
             e.preventDefault();
             toggleUnitSelection(e.target.dataset.uid, 1);
-            return;
-        }
-        if ((e.key === 'Enter' || e.key === ' ') && e.target?.closest?.('[data-action="showAppVersion"]')) {
-            e.preventDefault();
-            e.target.closest('[data-action="showAppVersion"]').click();
             return;
         }
         if (e.key === 'Escape') {
@@ -2581,7 +2506,7 @@
             setupSearchEngine();
             setupInitialView();
             renderPresetButtons();
-            restartNexusTitleRotation();
+            renderNexusHeaderVersion();
             updateHideCompletedBtn();
             requestAnimationFrame(() => {
                 debouncedUpdateAllPanels();

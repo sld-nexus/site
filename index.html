@@ -3,7 +3,7 @@
 <head>
     <script>
         // 앱 표시 및 리소스 캐시 공통 버전
-        window.APP_VERSION = "sld-nexus-V39";
+        window.APP_VERSION = "N-VAERON-V39";
         window.NEXUS_BUILD_VERSION = window.APP_VERSION;
         if (new URLSearchParams(window.location.search).get('nexusStandalone') === 'build') {
             document.documentElement.classList.add('nexus-standalone-build');
@@ -202,11 +202,11 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
-    <meta property="og:image" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-V39">
-    <meta property="og:image:secure_url" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-V39">
+    <meta property="og:image" content="https://sld-nexus.github.io/site/logo.png?v=N-VAERON-V39">
+    <meta property="og:image:secure_url" content="https://sld-nexus.github.io/site/logo.png?v=N-VAERON-V39">
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:alt" content="개복디 넥서스">
-    <meta name="twitter:image" content="https://sld-nexus.github.io/site/logo.png?v=sld-nexus-V39">
+    <meta name="twitter:image" content="https://sld-nexus.github.io/site/logo.png?v=N-VAERON-V39">
     <meta name="twitter:image:alt" content="개복디 넥서스">
     <meta name="description" content="유닛도감과 히든보드, 나의 조합의 필요 재료와 정수계산을 제공하는 개복디 넥서스">
     <meta property="og:type" content="website">
@@ -370,7 +370,10 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
                     </svg>
                 </span>
                 <div class="gh-title-wrap">
-                    <span class="gh-title" id="ghTitleText" data-action="showAppVersion" role="button" tabindex="0" aria-label="앱 버전 보기">개복디 넥서스</span>
+                    <div class="gh-title" id="ghTitleText">
+                        <span class="gh-title-mainline">개복디 넥서스</span>
+                        <span class="gh-title-subline">by VAERON<span id="ghTitleVersion"></span></span>
+                    </div>
                 </div>
             </div>
         </div>

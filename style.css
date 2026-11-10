@@ -31,14 +31,9 @@ svg { display:block; width:20px; height:20px; flex-shrink:0; }
 .gh-brand-mark { display:block; flex:0 0 30px; width:30px; height:30px; }
 .gh-brand-mark :is(svg,img) { width:100%; height:100%; filter:drop-shadow(0 0 5px rgba(245,197,102,.24)); }
 .gh-title-wrap { display:flex; flex-direction:column; align-items:flex-start; justify-content:center; min-width:0; flex:1; height:40px; }
-.gh-title { position:relative; display:flex; align-items:center; justify-content:flex-start; min-width:0; width:100%; min-height:24px; max-height:32px; overflow:hidden; cursor:pointer; text-align:left; font-size:16px; line-height:1.14; letter-spacing:-.04em; color:#f4ead1; text-shadow:0 0 12px #efd3a412; transition:opacity .18s,transform .18s,color .18s,text-shadow .18s; }
+.gh-title { display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:2px; min-width:0; width:100%; height:100%; overflow:hidden; text-align:left; color:#f4ead1; text-shadow:0 0 12px #efd3a412; }
 .gh-title-mainline { display:block; width:100%; overflow:hidden; text-overflow:ellipsis; padding-top:1px; font-size:18px; line-height:1.18; color:#f4ead1; letter-spacing:-.04em; white-space:nowrap; }
-.gh-title-stack { display:flex; flex-direction:column; justify-content:center; align-items:flex-start; gap:2px; width:100%; min-width:0; overflow:hidden; }
-.gh-title-label { font-size:9.5px; line-height:1; letter-spacing:.04em; color:#c4ac7f; }
-.gh-title-main { display:block; max-width:100%; font-size:13px; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#f4ead1; }
-.gh-title:hover { color:#fff5da; text-shadow:0 0 18px #efd3a426; }
-.gh-title.is-transitioning { opacity:0; transform:translateY(2px); }
-.gh-title.is-version-view .gh-title-main { font-family:var(--font-mono); }
+.gh-title-subline { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px; line-height:1.1; letter-spacing:.01em; color:#c4ac7f; }
 .gh-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); display:flex; flex-direction:row; justify-content:center; gap:0; }
 .gh-nav-btn { display:flex; align-items:center; gap:8px; width:auto; min-height:40px; padding:10px 14px; border:0; border-radius:9px; background:transparent; color:#bbc2cf; text-align:left; transition:background .18s,color .18s; }
 .gh-nav-btn:hover { background:#1d1e24; color:#eee3c7; }
@@ -65,8 +60,6 @@ svg { display:block; width:20px; height:20px; flex-shrink:0; }
     .gh-logo-text { gap:8px; }
     .gh-brand-mark,.gh-brand-mark :is(svg,img) { width:30px; height:30px; flex-basis:30px; }
     .gh-title-mainline { font-size:15.5px; }
-    .gh-title-main { font-size:14px; }
-    .gh-title { max-width:100%; }
     .gh-nav-btn { gap:9px; padding:12px 10px; max-width:clamp(78px, calc(15vw - 37px), 95px); }
 }
 @media (max-width:1024px) and (min-width:768px),
@@ -77,8 +70,7 @@ svg { display:block; width:20px; height:20px; flex-shrink:0; }
     .gh-left { flex:0 0 210px; height:40px; margin:0; }
     .gh-logo-text,.gh-title-wrap { height:40px; }
     .gh-title-mainline { font-size:15.5px; }
-    .gh-title-label { font-size:9.75px; }
-    .gh-title-main { font-size:14px; }
+    .gh-title-subline { font-size:9.75px; }
     .gh-center { gap:0; }
     .gh-nav-btn { width:auto; min-height:40px; padding:10px 12px; gap:8px; }
     .gh-nav-label { font-size:12px; }
@@ -89,12 +81,9 @@ svg { display:block; width:20px; height:20px; flex-shrink:0; }
     .gh-left { margin:0; height:30px; flex:0 0 30px; }
     .gh-logo-text { gap:9px; height:30px; }
     .gh-brand-mark,.gh-brand-mark :is(svg,img) { width:30px; height:30px; flex-basis:30px; }
-    .gh-title { min-height:28px; max-height:28px; max-width:100%; }
     .gh-title-wrap { flex-direction:column; align-items:flex-start; justify-content:center; height:30px; }
     .gh-title-mainline { font-size:13.5px; padding:0; }
-    .gh-title-label { font-size:8.75px; }
-    .gh-title-main { font-size:12.5px; }
-    .gh-title-stack { flex-direction:column; align-items:flex-start; gap:2px; height:28px; }
+    .gh-title-subline { font-size:8.75px; }
     .gh-center { position:static; transform:none; display:grid; width:100%; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0; margin:0 auto; }
     .gh-nav-btn { justify-content:center; width:100%; min-width:0; padding:10px 2px; min-height:40px; gap:4px; border-radius:7px; }
     .gh-nav-btn svg { width:15px; height:15px; }
@@ -108,8 +97,7 @@ svg { display:block; width:20px; height:20px; flex-shrink:0; }
     .global-header { height:42px; padding:1px 18px; }
     .gh-left { margin:0; }
     .gh-title-mainline { font-size:13.5px; }
-    .gh-title-label { font-size:8.75px; }
-    .gh-title-main { font-size:12.5px; }
+    .gh-title-subline { font-size:8.75px; }
 }
 
 /* 작업 공간 구조 / 화면별 표시 */
