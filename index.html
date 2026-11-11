@@ -3,7 +3,7 @@
 <head>
     <script>
         // 앱 표시 및 리소스 캐시 공통 버전
-        window.APP_VERSION = "N-VAERON-V39";
+        window.APP_VERSION = "N-VAERON-V40";
         window.NEXUS_BUILD_VERSION = window.APP_VERSION;
         if (new URLSearchParams(window.location.search).get('nexusStandalone') === 'build') {
             document.documentElement.classList.add('nexus-standalone-build');
@@ -69,10 +69,17 @@
         html.nexus-booting body{margin:0;background:#000000;color:#e7c57b;overflow:hidden;}
         html.nexus-booting .global-header,html.nexus-booting .main-layout,html.nexus-booting .recipe-tooltip{visibility:hidden;}
         #nexusBootScreen{position:fixed;inset:0;z-index:999999;display:flex;align-items:center;justify-content:center;background:#000000;font-family:system-ui,-apple-system,sans-serif;}
-        #nexusBootScreen .boot-card{width:min(360px,calc(100vw - 48px));padding:32px;border:1px solid #51432b;border-radius:20px;background:#15161a;text-align:center;box-shadow:0 16px 60px #00000040;}
+        #nexusBootScreen .boot-card{box-sizing:border-box;width:min(360px,calc(100vw - 48px));max-height:calc(100dvh - 24px);overflow-y:auto;padding:32px;border:1px solid #51432b;border-radius:20px;background:#15161a;text-align:center;box-shadow:0 16px 60px #00000040;}
         #nexusBootScreen .boot-title{font-size:19px;margin-bottom:10px;color:#e7c57b;}
         #nexusBootScreen .boot-desc{font-size:13px;line-height:1.7;color:#b2ac9f;}
         #nexusBootScreen .boot-error-code{display:inline-flex;margin:16px 0 4px;padding:8px 16px;border-radius:8px;background:#33211d;color:#e1a38d;}
+        #nexusBootScreen .boot-error-info{margin-top:12px;padding:12px;border:1px solid #51432b;border-radius:10px;background:#202125;text-align:left;}
+        #nexusBootScreen .boot-error-label{margin-bottom:5px;font-size:12px;font-weight:700;color:#e7c57b;}
+        #nexusBootScreen .boot-error-reason{font-size:13px;line-height:1.6;color:#eee7dc;white-space:pre-wrap;overflow-wrap:anywhere;}
+        #nexusBootScreen .boot-error-file{margin-top:8px;font-size:12px;color:#b2ac9f;overflow-wrap:anywhere;}
+        #nexusBootScreen .boot-duplicate-list{margin-top:12px;max-height:35vh;overflow-y:auto;text-align:left;}
+        #nexusBootScreen .boot-duplicate-item{padding:10px 0;border-top:1px solid #51432b;font-size:13px;color:#eee7dc;overflow-wrap:anywhere;}
+        #nexusBootScreen .boot-duplicate-position{margin-top:4px;font-size:12px;color:#b2ac9f;}
         #nexusBootScreen .boot-actions{display:flex;justify-content:center;gap:8px;margin-top:16px;}
         #nexusBootScreen .boot-action-btn{height:38px;padding:0 14px;border:1px solid #51432b;border-radius:8px;background:#15161a;color:#e7c57b;cursor:pointer;}
         #nexusBootScreen .boot-action-btn.primary{border-color:#e7c57b;background:#e7c57b;color:#211c12;}
@@ -101,22 +108,63 @@
                 }
             };
             window.nexusShowBootError=function(code, err){
+                if(window.__nexusBootError && window.NEXUS_LAST_BOOT_ERROR && window.NEXUS_LAST_BOOT_ERROR.code!==code) return;
                 window.__nexusBootError=true;
-                                try{window.NEXUS_LAST_BOOT_ERROR={code:code,error:err||'unknown',time:Date.now()};}catch{}
+                try{window.NEXUS_LAST_BOOT_ERROR={code:code,error:err||'unknown',time:Date.now()};}catch{}
                 if(document.readyState==='loading' && !document.getElementById('nexusBootScreen')){
                     document.addEventListener('DOMContentLoaded',function(){window.nexusShowBootError(code,err);},{once:true});
                     return;
                 }
                 try{
+                    var types={
+                        N1001:{title:'넥서스 실행 오류',guide:'초기화 중 오류가 발생했습니다. 아래 상세 원인을 확인하세요.'},
+                        N1002:{title:'스크립트 파일 로드 실패',guide:'표시된 JavaScript 파일의 경로와 배포 여부를 확인하세요.'},
+                        N1003:{title:'유닛 데이터 로드 실패',guide:'data.js와 UNIT_DATABASE 선언을 확인하세요.'},
+                        N1004:{title:'필수 리소스 로드 실패',guide:'표시된 CSS·이미지 파일이 정상적으로 제공되는지 확인하세요.'},
+                        N1005:{title:'중복 유닛명 확인 필요',guide:'data.js에서 중복 유닛명을 수정한 뒤 새로고침하세요.'}
+                    };
+                    var info=types[code]||{title:'넥서스 초기화 오류',guide:'오류 정보를 확인하세요.'};
+                    var reason=err && err.message ? String(err.message) : String(err || '상세 원인 정보가 없습니다.');
+                    var matched=(reason + "\n" + (err && err.stack || "")).match(/([\w.-]+\.(?:js|css|png|jpe?g|webp|svg))(?:\?[^\s]*)?/i);
+                    var file=err && (err.file || err.fileName) || (matched && matched[1]) || (code==='N1003' || code==='N1005'?'data.js':'');
+                    var duplicates=err && Array.isArray(err.duplicates) ? err.duplicates : [];
                     document.documentElement.classList.add('nexus-booting','nexus-boot-error');
                     var boot=document.getElementById('nexusBootScreen');
                     if(boot){
                         boot.removeAttribute('aria-hidden');
-                        boot.innerHTML='<div class="boot-card"><div class="boot-title">넥서스 초기화에 실패했습니다</div><div class="boot-desc">새로고침 후에도 반복되면 제작자에게 아래 오류코드를 전달해주세요.</div><div class="boot-error-code" aria-label="오류코드">'+code+'</div><div class="boot-actions"><button class="boot-action-btn" id="nexusBootCopyBtn" type="button">오류코드 복사</button><button class="boot-action-btn primary" type="button" onclick="window.location.reload()">새로고침</button></div></div>';
+                        boot.innerHTML='<div class="boot-card"><div class="boot-title" id="nexusBootTitle"></div><div class="boot-desc" id="nexusBootDesc"></div><div class="boot-error-code" id="nexusBootCode" aria-label="오류코드"></div><div class="boot-error-info"><div class="boot-error-label">상세 원인</div><div class="boot-error-reason" id="nexusBootReason"></div><div class="boot-error-file" id="nexusBootFile" hidden></div><div class="boot-duplicate-list" id="nexusBootDuplicateList" hidden></div></div><div class="boot-actions"><button class="boot-action-btn" id="nexusBootCopyBtn" type="button">오류 정보 복사</button><button class="boot-action-btn primary" id="nexusBootReloadBtn" type="button">새로고침</button></div></div>';
+                        document.getElementById('nexusBootTitle').textContent=info.title;
+                        document.getElementById('nexusBootDesc').textContent=info.guide;
+                        document.getElementById('nexusBootCode').textContent=code;
+                        document.getElementById('nexusBootReason').textContent=reason;
+                        var fileElement=document.getElementById('nexusBootFile');
+                        if(file){fileElement.textContent='관련 파일: '+file;fileElement.hidden=false;}
+                        var list=document.getElementById('nexusBootDuplicateList');
+                        if(duplicates.length){
+                            list.hidden=false;
+                            duplicates.forEach(function(item){
+                                var row=document.createElement('div');
+                                row.className='boot-duplicate-item';
+                                var heading=document.createElement('div');
+                                heading.textContent='유닛명: '+item.name+' (중복 '+item.positions.length+'개)';
+                                var location=document.createElement('div');
+                                location.className='boot-duplicate-position';
+                                location.textContent='UNIT_DATABASE 데이터 순서: '+item.positions.join(', ');
+                                row.appendChild(heading);
+                                row.appendChild(location);
+                                list.appendChild(row);
+                            });
+                        }
                         var copyBtn=document.getElementById('nexusBootCopyBtn');
-                        if(copyBtn) copyBtn.onclick=function(){ window.nexusCopyBootErrorCode(code, copyBtn); };
+                        var reloadBtn=document.getElementById('nexusBootReloadBtn');
+                        if(copyBtn) copyBtn.onclick=function(){
+                            var report=[code,info.title,reason,file?'관련 파일: '+file:''];
+                            duplicates.forEach(function(item){report.push('유닛명: '+item.name+' / 중복 '+item.positions.length+'개 / UNIT_DATABASE 데이터 순서: '+item.positions.join(', '));});
+                            window.nexusCopyBootErrorCode(report.filter(Boolean).join('\n'),copyBtn);
+                        };
+                        if(reloadBtn) reloadBtn.onclick=function(){window.location.reload();};
                     }
-                }catch{}
+                }catch(e){window.NEXUS_BOOT_RENDER_ERROR=e;}
             };
             window.addEventListener('error',function(event){
                 if(event.error && !window.__nexusAppReady && !window.__nexusBootError){
@@ -127,7 +175,7 @@
                 var link=event.target;
                 if(link && link.matches && link.matches('link[data-boot-style]')){
                     link.dataset.loadFailed='1';
-                    window.nexusShowBootError('N1004',new Error('style.css load failed'));
+                    window.nexusShowBootError('N1004',new Error((link.getAttribute('href') || 'stylesheet') + ' load failed'));
                 }
             },true);
             function waitForEssentialResources(){
@@ -139,11 +187,11 @@
                     var links=Array.from(document.querySelectorAll('link[data-boot-style]'));
                     if(links.length!==3) return Promise.reject(new Error('required stylesheet missing'));
                     return Promise.all(links.map(function(link){
-                        if(link.dataset.loadFailed==='1') return Promise.reject(new Error('required stylesheet failed'));
+                        if(link.dataset.loadFailed==='1') return Promise.reject(new Error((link.getAttribute('href') || 'stylesheet') + ' load failed'));
                         if(link.sheet) return Promise.resolve();
                         return new Promise(function(resolve,reject){
                             link.addEventListener('load',resolve,{once:true});
-                            link.addEventListener('error',function(){reject(new Error('required stylesheet failed'));},{once:true});
+                            link.addEventListener('error',function(){reject(new Error((link.getAttribute('href') || 'stylesheet') + ' load failed'));},{once:true});
                         });
                     }));
                 }
@@ -202,11 +250,11 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
-    <meta property="og:image" content="https://sld-nexus.github.io/site/logo.png?v=N-VAERON-V39">
-    <meta property="og:image:secure_url" content="https://sld-nexus.github.io/site/logo.png?v=N-VAERON-V39">
+    <meta property="og:image" content="https://sld-nexus.github.io/site/logo.png?v=N-VAERON-V40">
+    <meta property="og:image:secure_url" content="https://sld-nexus.github.io/site/logo.png?v=N-VAERON-V40">
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:alt" content="개복디 넥서스">
-    <meta name="twitter:image" content="https://sld-nexus.github.io/site/logo.png?v=N-VAERON-V39">
+    <meta name="twitter:image" content="https://sld-nexus.github.io/site/logo.png?v=N-VAERON-V40">
     <meta name="twitter:image:alt" content="개복디 넥서스">
     <meta name="description" content="유닛도감과 히든보드, 나의 조합의 필요 재료와 정수계산을 제공하는 개복디 넥서스">
     <meta property="og:type" content="website">

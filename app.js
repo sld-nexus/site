@@ -6,6 +6,7 @@
 
     const USER_CONFIG = window.NEXUS_USER_CONFIG || {};
     const clean = (s) => s ? String(s).replace(/\s+/g, '').toLowerCase() : '';
+    const isReserveUnitName = (name) => /^(?:예비슬롯|에비슬롯)(?:_|$)/.test(clean(name));
     const getUserConfigMap = (map) => Object.fromEntries(Object.entries(map || {}).map(([name, value]) => [clean(name), value]));
     const getUserConfigIds = (names) => new Set((Array.isArray(names) ? names : []).map(clean));
     const SELECTION_CONFIG = USER_CONFIG["검색·선택 설정"] || {};
@@ -1953,7 +1954,7 @@
         const versionText = getEl('ghTitleVersion');
         if (!versionText) return;
         const buildVersion = String(window.APP_VERSION || window.NEXUS_BUILD_VERSION || '');
-        const shortVersion = buildVersion.match(/V\d+(?:\.\d+)*$/i)?.[0] || '';
+        const shortVersion = buildVersion.match(/N-VAERON-(.+)$/i)?.[1] || '';
         versionText.textContent = shortVersion ? ` · ${shortVersion}` : '';
     };
     function updateBoardHeader() {
@@ -2486,9 +2487,26 @@
     function startNexusApp(){
         try {
             document.documentElement.lang = 'ko';
-            updatePivotColumns();
             if (typeof UNIT_DATABASE === 'undefined' || !Array.isArray(UNIT_DATABASE)) { markNexusAppError("N1003", new Error("UNIT_DATABASE load failed")); return; }
+            // 예비 슬롯은 데이터만 보관한다. 일반 유닛명 중복은 등록 전에 검출해 덮어쓰기를 방지한다.
+            const unitNames = new Map();
+            UNIT_DATABASE.forEach((kArr, index) => {
+                if (isReserveUnitName(kArr[0])) return;
+                const id = clean(kArr[0]);
+                if (!unitNames.has(id)) unitNames.set(id, { name: kArr[0], positions: [] });
+                unitNames.get(id).positions.push(index + 1);
+            });
+            const duplicates = [...unitNames.values()].filter(entry => entry.positions.length > 1);
+            if (duplicates.length) {
+                const error = new Error('data.js에 중복된 유닛명이 있습니다.');
+                error.file = 'data.js';
+                error.duplicates = duplicates;
+                markNexusAppError('N1005', error);
+                return;
+            }
+            updatePivotColumns();
             UNIT_DATABASE.forEach(kArr => {
+                if (isReserveUnitName(kArr[0])) return;
                 const id = clean(kArr[0]);
                 unitMap.set(id, { id, name: kArr[0], grade: kArr[1] || SYSTEM_CONFIG.grades.order[0], category: kArr[2] || SYSTEM_CONFIG.tabs[0].key, recipe: kArr[3], cost: kArr[4] });
             });
