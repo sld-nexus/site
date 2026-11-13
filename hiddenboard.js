@@ -115,9 +115,9 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
 
         const renderHiddenboardSlot = (id, n, g) => {
             const unit = ctx.unitMap.get(id);
-            const essenceText = ctx.getUnitUnitboardEssenceText(unit) || `<div class="uc-essence-summary" aria-label="${ctx.escapeHtml(n)} 정수정보"><span class="uc-essence-empty">정수 <span class="uc-essence-value">0</span></span></div>`;
+            const essenceText = ctx.getUnitUnitboardEssenceText(unit);
             const noticeHtml = ctx.getUnitCardNotesHtml(unit);
-            return `<div class="hiddenboard-slot" id="d-slot-wrap-${id}" data-uid="${id}" data-detail-view="usage"><div class="d-slot-main"><div class="d-name"><div class="d-grade-row"><div class="d-grade-left"><span class="gtag grade-${g}">${g}</span></div><div class="d-card-actions"><span class="d-target-control"><button type="button" class="d-info-button" data-hiddenboard-info="${id}" data-info-view="usage" aria-label="${n} 상위 조합 추적" aria-haspopup="dialog" aria-expanded="false" title="상위 조합 추적 · 사용처"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3.5M12 18.5V22M2 12h3.5M18.5 12H22"/></svg></button><span class="d-tracking-bubble" id="tracking-hint-${id}" role="tooltip" hidden><kbd>ESC</kbd> 또는 빈 공간 클릭 시 추적 해제</span></span><button type="button" class="d-info-button" data-hiddenboard-info="${id}" data-info-view="recipe" aria-label="${n} 조합법 정보" aria-haspopup="dialog" aria-expanded="false" title="조합법 정보"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v6M12 7v.2"/></svg></button></div></div><div class="d-name-line"><span class="d-name-inline">${n}${ctx.CLEAN_SPECIAL_CONDITIONS[id]?`<span class="badge-special-cond recipe-cond-offset">특수조건</span>`:''}</span></div>${noticeHtml}${essenceText}</div></div><div id="d-cond-${id}" class="d-cond-inline"></div><div class="d-detail-wrap"><div class="d-detail-toolbar"><div class="d-detail-tabs" role="group" aria-label="${n} 표시 정보"><button type="button" class="d-detail-tab is-active" data-action="switchHiddenboardDetail" data-uid="${id}" data-detail-view="usage" aria-pressed="true" aria-controls="d-reason-${id}">사용처</button><button type="button" class="d-detail-tab" data-action="switchHiddenboardDetail" data-uid="${id}" data-detail-view="recipe" aria-pressed="false" aria-controls="d-recipe-${id}">조합법</button></div><span class="d-detail-meta d-usage-hint" title="사용처 유닛을 클릭하면 목표를 추적합니다">목표추적 ↗</span><span class="d-detail-meta d-recipe-meta"></span></div><div class="d-detail-panels"><div class="d-reason-wrap" id="d-reason-${id}" aria-hidden="false"></div><div class="d-recipe-wrap" id="d-recipe-${id}" aria-hidden="true" inert></div></div></div><div class="d-goal-recipe-wrap" id="d-goal-recipe-${id}"></div><div id="craft-wrap-${id}" class="craft-wrap"></div></div>`;
+            return `<div class="hiddenboard-slot" id="d-slot-wrap-${id}" data-uid="${id}" data-detail-view="usage"><div class="d-slot-main"><div class="d-name"><div class="d-grade-row"><div class="d-grade-left"><span class="gtag grade-${g}">${g}</span></div><button type="button" class="d-target-badge" data-action="toggleHighlight" data-uid="${id}" aria-pressed="false" hidden>조합추적</button></div><div class="d-name-line"><span class="d-name-inline">${n}${ctx.CLEAN_SPECIAL_CONDITIONS[id]?`<span class="badge-special-cond recipe-cond-offset">특수조건</span>`:''}</span></div>${noticeHtml}${essenceText}</div></div><div id="d-cond-${id}" class="d-cond-inline"></div><div class="d-detail-wrap"><div class="d-detail-toolbar"><div class="d-detail-tabs" role="group" aria-label="${n} 표시 정보"><button type="button" class="d-detail-tab is-active" data-action="switchHiddenboardDetail" data-uid="${id}" data-detail-view="usage" aria-pressed="true" aria-controls="d-reason-${id}">상위조합</button><button type="button" class="d-detail-tab" data-action="switchHiddenboardDetail" data-uid="${id}" data-detail-view="recipe" aria-pressed="false" aria-controls="d-recipe-${id}">조합법</button></div><span class="d-detail-meta d-usage-hint" title="상위조합의 유닛명을 선택하면 해당 조합을 추적합니다">선택 시 추적 ↗</span><span class="d-detail-meta d-recipe-meta"></span></div><div class="d-detail-panels"><div class="d-reason-wrap" id="d-reason-${id}" aria-hidden="false"></div><div class="d-recipe-wrap" id="d-recipe-${id}" aria-hidden="true" inert></div></div></div><div class="d-goal-recipe-wrap" id="d-goal-recipe-${id}"></div><div id="craft-wrap-${id}" class="craft-wrap"></div></div>`;
         };
         const getGrp = (id, pid, title, resetLevel=0, isCol=false, alwaysShow=false, alwaysOpen=false, resetLabel='완료복구') => `
             <div class="hiddenboard-group" id="${id}" style="${alwaysShow ? '' : 'display:none;'}" ${alwaysShow ? 'data-always-show="true"' : ''} ${alwaysOpen ? 'data-always-open="true"' : ''}>
@@ -148,129 +148,6 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         placeHiddenboardControls();
     }
 
-    // 카드 밖에 하나의 팝오버를 띄워 카드 높이와 그리드 정렬을 유지합니다.
-    let detailPopover = null;
-    let detailTrigger = null;
-    let detailAnchor = null;
-    let detailView = 'usage';
-    let trackingOriginId = null;
-
-    function closeDetailPopover(restoreFocus = false) {
-        if (!detailPopover) return;
-        detailPopover.remove();
-        detailPopover = null;
-        detailTrigger?.setAttribute('aria-expanded', 'false');
-        if (restoreFocus && detailTrigger?.isConnected) detailTrigger.focus({ preventScroll: true });
-        detailTrigger = null;
-    }
-
-    function positionDetailPopover() {
-        if (!detailPopover || !detailAnchor) return;
-        const viewport = window.visualViewport;
-        const left = viewport?.offsetLeft || 0, top = viewport?.offsetTop || 0;
-        const width = viewport?.width || window.innerWidth;
-        const height = viewport?.height || window.innerHeight;
-        const edge = 12, gap = 10;
-        detailPopover.style.maxHeight = `${Math.max(80, height - edge * 2)}px`;
-        detailPopover.style.width = `${Math.min(340, width - edge * 2)}px`;
-        const rect = detailPopover.getBoundingClientRect();
-        let x = detailAnchor.x - rect.width, y = detailAnchor.y + gap;
-        if (x + rect.width > left + width - edge) x = detailAnchor.x - rect.width;
-        if (y + rect.height > top + height - edge) y = detailAnchor.top - rect.height - gap;
-        detailPopover.style.left = `${Math.max(left + edge, Math.min(x, left + width - rect.width - edge))}px`;
-        detailPopover.style.top = `${Math.max(top + edge, Math.min(y, top + height - rect.height - edge))}px`;
-    }
-
-    function getUsageTrackingTargets(id) {
-        return [...ctx._hiddenboardSlotElsByUid.values()]
-            .filter(slot => slot.classList.contains('is-final-goal') && ctx.activeUnits.has(slot.dataset.uid) && ctx.getDependencies(slot.dataset.uid).has(id))
-            .map(slot => {
-                const uid = slot.dataset.uid;
-                return { unit: ctx.unitMap.get(uid), qty: ctx.activeUnits.get(uid) || 1 };
-            }).filter(target => target.unit);
-    }
-
-    function renderDetailPopover() {
-        if (!detailPopover || !detailTrigger) return;
-        const id = detailTrigger.dataset.hiddenboardInfo;
-        const unit = ctx.unitMap.get(id);
-        const slot = ctx._hiddenboardSlotElsByUid.get(id);
-        if (!unit || !slot) return closeDetailPopover();
-        const { multi, countLabel } = getHiddenboardRecipeQuantity(id);
-        const targets = getUsageTrackingTargets(id);
-        const goalCount = targets.reduce((sum, target) => sum + target.qty, 0);
-        const reasons = targets.map(({ unit: goal, qty }) => `<button type="button" class="d-reason-tag is-split-reason tag-grade-${goal.grade}" data-action="toggleHighlight" data-uid="${goal.id}"><span class="d-reason-grade">${ctx.escapeHtml(goal.grade)}</span><span class="d-reason-main">${ctx.escapeHtml(goal.name)}</span><span class="d-reason-qty">×${qty}</span></button>`).join('');
-        const meta = detailView === 'usage' ? `최종목표 ${goalCount}기 · 추적할 목표를 선택하세요.` : countLabel;
-        detailPopover.innerHTML = `<div class="hb-popover-heading"><div class="hb-popover-title-group"><strong id="hb-popover-title">${detailView === 'usage' ? '사용처' : '조합법'}</strong><span class="hb-popover-unit">${ctx.escapeHtml(unit.name)}</span></div><button type="button" class="hb-popover-close" aria-label="정보 닫기">×</button></div>${meta ? `<div class="hb-popover-hint">${ctx.escapeHtml(meta)}</div>` : ''}<div class="hb-popover-content">${detailView === 'usage' ? (reasons || '<p class="hb-popover-empty">연결된 최종목표 없음</p>') : `<span class="recipe-label">조합 조건</span>${ctx.formatRecipe(unit, multi, true)}`}</div><div class="hb-popover-footer"><kbd>ESC</kbd><span>또는 빈 공간 클릭 시 닫힘</span></div>`;
-        positionDetailPopover();
-    }
-
-    document.addEventListener('click', event => {
-        const trigger = event.target.closest('[data-hiddenboard-info]');
-        if (trigger) {
-            event.preventDefault();
-            event.stopPropagation();
-            const slot = ctx._hiddenboardSlotElsByUid.get(trigger.dataset.hiddenboardInfo);
-            if (trigger.dataset.infoView === 'usage' && (slot?.classList.contains('is-final-goal') || (ctx._currentHighlight && trackingOriginId === trigger.dataset.hiddenboardInfo))) {
-                closeDetailPopover();
-                const stopTracking = ctx._currentHighlight && trackingOriginId === trigger.dataset.hiddenboardInfo;
-                trackingOriginId = trigger.dataset.hiddenboardInfo;
-                ctx.toggleHighlight(stopTracking ? null : trigger.dataset.hiddenboardInfo, event);
-                return;
-            }
-            if (trigger.dataset.infoView === 'usage') {
-                const targets = getUsageTrackingTargets(trigger.dataset.hiddenboardInfo);
-                if (targets.length === 1) {
-                    closeDetailPopover();
-                    trackingOriginId = trigger.dataset.hiddenboardInfo;
-                    ctx.toggleHighlight(targets[0].unit.id, event);
-                    return;
-                }
-            }
-            if (trigger === detailTrigger) return closeDetailPopover();
-            closeDetailPopover();
-            detailTrigger = trigger;
-            detailView = trigger.dataset.infoView === 'recipe' ? 'recipe' : 'usage';
-            const rect = trigger.getBoundingClientRect();
-            detailAnchor = { x: rect.right, y: rect.bottom, top: rect.top };
-            detailPopover = document.createElement('section');
-            detailPopover.className = 'hb-detail-popover';
-            detailPopover.id = 'hb-detail-popover';
-            detailPopover.setAttribute('role', 'dialog');
-            detailPopover.setAttribute('aria-labelledby', 'hb-popover-title');
-            document.body.appendChild(detailPopover);
-            trigger.setAttribute('aria-expanded', 'true');
-            trigger.setAttribute('aria-controls', 'hb-detail-popover');
-            renderDetailPopover();
-            if (event.detail === 0) detailPopover.querySelector('.hb-popover-close').focus({ preventScroll: true });
-            return;
-        }
-        if (event.target.closest('.hb-popover-close')) {
-            event.stopPropagation();
-            return closeDetailPopover(true);
-        }
-        const usageTarget = event.target.closest('[data-action="toggleHighlight"]');
-        if (usageTarget && detailPopover?.contains(usageTarget)) {
-            trackingOriginId = detailTrigger?.dataset.hiddenboardInfo || usageTarget.dataset.uid;
-            ctx.toggleHighlight(usageTarget.dataset.uid, event);
-            closeDetailPopover();
-            return;
-        }
-        if (detailPopover && !detailPopover.contains(event.target)) closeDetailPopover();
-    }, true);
-    document.addEventListener('pointerdown', event => {
-        if (detailPopover && !detailPopover.contains(event.target) && !event.target.closest('[data-hiddenboard-info]')) closeDetailPopover();
-    }, true);
-    document.addEventListener('keydown', event => {
-        if (event.key === 'Escape' && detailPopover) { event.preventDefault(); closeDetailPopover(true); }
-    });
-    document.addEventListener('focusin', event => {
-        if (detailPopover && !detailPopover.contains(event.target) && event.target !== detailTrigger && !event.target.closest('[data-hiddenboard-info]')) closeDetailPopover();
-    });
-    document.addEventListener('scroll', event => {
-        if (detailPopover && event.target !== detailPopover && !detailPopover.contains(event.target)) closeDetailPopover();
-    }, true);
-    window.addEventListener('resize', () => closeDetailPopover());
 
     function getHiddenboardRecipeQuantity(id, calcResult) {
         const unit = ctx.unitMap.get(id);
@@ -298,9 +175,9 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         const renderKey = `${multi}:${countLabel}`;
         if (recipeEl._renderKey === renderKey) return;
         if (isGoal) {
-            recipeEl.innerHTML = `<div class="uc-recipe-area"><span class="recipe-label">조합 조건<span class="d-recipe-count">${ctx.escapeHtml(countLabel)}</span></span>${ctx.formatRecipe(unit, multi)}</div>`;
+            recipeEl.innerHTML = `<div class="uc-recipe-area"><span class="recipe-label">조합 조건<span class="d-recipe-count">${multi}개 기준</span></span>${ctx.formatRecipe(unit, multi)}</div>`;
         } else {
-            slotEl.querySelector(".d-recipe-meta").textContent = countLabel;
+            slotEl.querySelector(".d-recipe-meta").textContent = `${unit.name} · ${countLabel}`;
             recipeEl.innerHTML = `<div class="d-recipe-content">${ctx.formatRecipe(unit, multi, true)}</div>`;
         }
         recipeEl._renderKey = renderKey;
@@ -317,7 +194,7 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
             tab.setAttribute('aria-pressed', String(selected));
         });
         // 두 패널의 높이를 함께 확보하여 탭 전환에도 카드와 하단 버튼 정렬을 유지합니다.
-        // 클릭할 수 있는 사용처 태그는 선택된 탭에서만 활성화합니다.
+        // 클릭할 수 있는 상위조합 태그는 선택된 탭에서만 활성화합니다.
         for (const [panel, selected] of [
             [slotEl.querySelector('.d-reason-wrap'), activeView === 'usage'],
             [slotEl.querySelector('.d-recipe-wrap'), activeView === 'recipe']
@@ -372,7 +249,7 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         grid.appendChild(frag);
     }
 
-    // 조합 진행도 차감을 적용한 사용처 수량: 화면 표시 전용 계산.
+    // 조합 진행도 차감을 적용한 상위조합 수량: 화면 표시 전용 계산.
     function getHiddenboardReasonDisplayEntries(slotId, rMap, reqMap) {
         const getReasonParentNeed = (info) => {
             if (!info?.parentUid) return 0;
@@ -407,7 +284,7 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
             .map(entry => [entry.rId, { ...entry.info, displayQty: entry.displayQty, _reasonOrder: entry.index }]);
     }
 
-    // 카드 사용처·조합 조건 표시는 재료 배치/완료 상태 변경과 분리한다.
+    // 카드 상위조합·조합 조건 표시는 재료 배치/완료 상태 변경과 분리한다.
     function renderHiddenboardSlotReasons({ id, slotEl, needed, isTarget, isMergedSlot, reasonMap, getCachedReasonEntries, targetHighlight, highlightDeps }) {
         const getReasonTagClass = (info) => info?.tagClass || ctx.DEFAULT_REASON_TAG_CLASS;
         const isSplitReason = (info) => info?.depth !== 0 && !!info?.reasonCenterHtml;
@@ -431,7 +308,7 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
                         i.parentUid === targetHighlight ||
                         (highlightDeps && highlightDeps.has(i.parentUid))
                     );
-                    if (filtered.length > 0) allEntries = filtered;
+                    allEntries = filtered;
                 }
                 if (allEntries.length > 0) {
                     const sorted = allEntries.sort((a, b) =>
@@ -474,8 +351,7 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
 
             if (condMap.size > 0) {
                 cEl.style.display = 'flex';
-                const finalGoalCount = getUsageTrackingTargets(id).length;
-                cEl.innerHTML = `<span class="recipe-label">조합 조건<span class="d-condition-goal-count">· 최종목표 ${finalGoalCount}개</span></span>` + Array.from(condMap, ([condStr, qty]) => `<div class="d-condition-row"><span class="d-cond-text">${ctx.escapeHtml(condStr)}</span><span class="d-cond-qty">${qty}개</span></div>`).join('');
+                cEl.innerHTML = '<span class="recipe-label">조합 조건</span>' + Array.from(condMap, ([condStr, qty]) => `<div class="d-condition-row"><span class="d-cond-text">${ctx.escapeHtml(condStr)}</span><span class="d-cond-qty">${qty}개</span></div>`).join('');
             } else {
                 cEl.style.display = 'none';
                 cEl.innerHTML = '';
@@ -608,8 +484,6 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         const mergedSlots = new Set();
 
         const targetHighlight = ctx._currentHighlight || null;
-        if (!targetHighlight) trackingOriginId = null;
-        else if (!trackingOriginId) trackingOriginId = targetHighlight;
         const highlightDeps = targetHighlight ? ctx.getDependencies(targetHighlight) : null;
         ctx.getEl('boardContent')?.classList.toggle('highlight-mode', !!targetHighlight);
 
@@ -711,6 +585,17 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
 
             const isFinalGoal = tGrid === grids.target;
             slotEl.classList.toggle('is-final-goal', isFinalGoal);
+            const targetButton = slotEl.querySelector('.d-target-badge');
+            if (targetButton) {
+                const canTrack = isFinalGoal || tGrid === grids.special;
+                targetButton.hidden = !canTrack;
+                if (canTrack) {
+                    const isTracking = targetHighlight === id;
+                    targetButton.classList.toggle('is-tracking', isTracking);
+                    targetButton.setAttribute('aria-pressed', String(isTracking));
+                    targetButton.textContent = isTracking ? '추적 해제' : '조합추적';
+                }
+            }
             if (isFinalGoal) renderHiddenboardRecipe(slotEl, calcResult);
             else switchHiddenboardDetail(id, slotEl.dataset.detailView, calcResult);
             const cWrap = slotEl.querySelector(`#craft-wrap-${id}`);
@@ -720,29 +605,6 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
                     const qtyButtons = isFinalGoal ? '' : `<button type="button" class="pc-btn" data-action="addComplete" data-uid="${id}" data-batch="1"><span class="batch-plus" aria-hidden="true">+</span>1개</button><button type="button" class="pc-btn" data-action="addComplete" data-uid="${id}" data-batch="10"${tenDisabled}><span class="batch-plus" aria-hidden="true">+</span>10개</button>`;
                     cWrap.innerHTML = `<div class="craft-wrap-left"><span class="req-text">${needed}</span><span class="req-label">개</span></div><div class="craft-wrap-right">${qtyButtons}<button type="button" class="btn-complete" data-action="completeUnit" data-uid="${id}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m5 12 4 4 10-10"/></svg>완료</button></div>`;
                 } else cWrap.innerHTML = `<div class="craft-wrap-left"><span class="req-text">0</span><span class="req-label">개</span></div><div class="craft-wrap-right"><span class="complete-done-label">완료됨</span></div>`;
-            }
-
-            const trackingIcon = slotEl.querySelector('[data-info-view="usage"]');
-            if (trackingIcon) {
-                const isTracking = !!targetHighlight && ((isFinalGoal && targetHighlight === id) || trackingOriginId === id);
-                const showTrackingHint = !!targetHighlight && trackingOriginId === id;
-                const name = ctx.unitMap.get(id)?.name || id;
-                trackingIcon.classList.toggle('is-tracking', isTracking);
-                slotEl.querySelector('.d-tracking-bubble').hidden = !showTrackingHint;
-                trackingIcon.setAttribute('aria-label', `${name} ${isTracking ? '추적 해제' : (isFinalGoal ? '목표추적' : '상위 조합 추적')}`);
-                trackingIcon.title = isTracking ? '추적 해제' : (isFinalGoal ? '목표추적' : '상위 조합 추적 · 사용처');
-                if (isFinalGoal || isTracking) {
-                    trackingIcon.setAttribute('aria-pressed', String(isTracking));
-                    trackingIcon.removeAttribute('aria-haspopup');
-                    trackingIcon.removeAttribute('aria-expanded');
-                    trackingIcon.removeAttribute('aria-controls');
-                } else {
-                    trackingIcon.removeAttribute('aria-pressed');
-                    trackingIcon.setAttribute('aria-haspopup', 'dialog');
-                    trackingIcon.setAttribute('aria-expanded', String(trackingIcon === detailTrigger));
-                }
-                if (showTrackingHint) trackingIcon.setAttribute('aria-describedby', `tracking-hint-${id}`);
-                else trackingIcon.removeAttribute('aria-describedby');
             }
 
             const gridId = tGrid?.id || '';
@@ -757,7 +619,7 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
                 } else {
                     slotEl.classList.remove('is-visible');
                 }
-                slotEl.style.display = hideT ? 'none' : 'flex';
+                slotEl.style.display = hideT ? 'none' : ''; // 표시 레이아웃은 CSS(PC 공통 행 / 모바일 flex)에 맡깁니다.
                 (gridFragments.get(tGrid) || tGrid).appendChild(slotEl);
             }
 

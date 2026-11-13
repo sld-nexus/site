@@ -1960,6 +1960,21 @@
     function updateBoardHeader() {
         const hiddenboardActions = getEl('hiddenboardGlobalActions');
         if (hiddenboardActions) hiddenboardActions.hidden = _currentViewMode !== 'hiddenboard';
+        // 카드가 스크롤 밖으로 나가도 현재 추적 대상과 해제 방법을 확인합니다.
+        let trackingStatus = getEl('hiddenboardTrackingStatus');
+        const board = getEl('boardContent');
+        if (!trackingStatus && board) {
+            trackingStatus = document.createElement('div');
+            trackingStatus.id = 'hiddenboardTrackingStatus';
+            trackingStatus.className = 'hiddenboard-tracking-status';
+            trackingStatus.hidden = true;
+            trackingStatus.innerHTML = '<div class="tracking-status-main" role="status" aria-live="polite" aria-atomic="true"><span class="tracking-status-label">추적 중</span><span id="hiddenboardTrackingName" class="tracking-status-name"></span></div><span class="tracking-status-hint">Esc 또는 빈 공간 클릭으로 추적 해제</span><button type="button" class="tracking-status-close" data-action="toggleHighlight" aria-label="추적 해제" title="추적 해제">×</button>';
+            board.before(trackingStatus);
+        }
+        if (trackingStatus) {
+            trackingStatus.hidden = _currentViewMode !== 'hiddenboard' || !_currentHighlight;
+            getEl('hiddenboardTrackingName').textContent = _currentHighlight ? (unitMap.get(_currentHighlight)?.name || _currentHighlight) : '';
+        }
     }
 
 
@@ -2050,6 +2065,7 @@
             board.classList.add('highlight-mode');
         }
         
+        updateBoardHeader();
         debouncedUpdateAllPanels();
     }
 
