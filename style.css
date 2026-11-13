@@ -554,3 +554,12 @@ body .nexus-labelled-control[hidden]{display:none!important}
     .btn-reset-action::before { content:""; position:absolute; left:0; top:50%; width:1px; height:14px; background:var(--line); transform:translateY(-50%); }
 }
 @media (prefers-reduced-motion:reduce) { .action-feedback { transition:none; } }
+
+/* 유닛 카드 공통 10px 간격 */
+.uc-head { padding:10px; }
+.uc-meta-row { position:relative; align-items:flex-start; min-height:0; margin-bottom:10px; padding-right:30px; }
+.uc-fav-btn { position:absolute; right:0; top:50%; transform:translateY(-50%); }
+.uc-head .uc-notes,.uc-head .uc-essence-summary { margin-top:10px; }
+.uc-recipe-area,.uc-ctrl-area { padding:10px; }
+.recipe-label { margin-bottom:10px; }
+.unit-card .recipe-vertical,.uc-meta-row,.uc-ctrl-area { gap:10px; }

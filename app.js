@@ -2447,6 +2447,7 @@
         get normalizeSavedId() { return normalizeSavedId; },
         get normalizeUnitQty() { return normalizeUnitQty; },
         get pausedUnits() { return pausedUnits; },
+        get toggleHighlight() { return toggleHighlight; },
         get placeHiddenboardControls() { return placeHiddenboardControls; },
         get renderInvenboardGradeTag() { return renderInvenboardGradeTag; },
         get resetCompletedMaterialsByLevel() { return resetCompletedMaterialsByLevel; },

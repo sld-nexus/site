@@ -48,25 +48,28 @@
     background:currentColor; transform-origin:left; animation:reset-wait 2s linear forwards; }
 .hiddenboard-ph-btns .reset-btn-done:disabled { opacity:1; color:#a4d6bc; }
 @keyframes reset-wait { from { transform:scaleX(1); } to { transform:scaleX(0); } }
-.hiddenboard-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding-top:14px; }
+.hiddenboard-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding-top:14px; align-items:stretch; }
 .hiddenboard-page { display:contents; }
-.hiddenboard-slot { display:none; flex-direction:column; position:relative; min-width:0; overflow:hidden; min-height:178px; transition:opacity .2s,filter .2s,background .18s,border-color .2s,box-shadow .18s; }
+.hiddenboard-slot { display:none; flex-direction:column; position:relative; min-width:0; overflow:hidden; min-height:0; transition:opacity .2s,filter .2s,background .18s,border-color .2s,box-shadow .18s; }
 .hiddenboard-slot.is-final-goal { min-height:0; }
 .hiddenboard-slot.is-visible { display:flex; }
 .hiddenboard-slot.has-target { background:var(--card-surface); }
 .hiddenboard-slot-pool { display:none; }
 /* 재료 사용처·조합법 표시 */
 .d-detail-wrap { border-top:1px solid var(--line); background:#ffffff03; }
-.d-detail-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0; padding:7px 16px 0; }
-.d-detail-tab { display:inline-flex; align-items:center; justify-content:center; width:100%; min-width:0; min-height:22px; padding:2px 4px 3px; border:0; border-bottom:1px solid transparent; border-radius:0; background:transparent; color:var(--text-muted); font-size:calc(10px * var(--fs-scale)); font-weight:600; line-height:1.5; cursor:pointer; transition:color .18s,border-color .18s; }
-.d-detail-tab:hover { color:var(--text); }
-.d-detail-tab.is-active { color:var(--accent); border-bottom-color:var(--accent); }
-.d-detail-panels { display:grid; grid-template-columns:minmax(0,1fr); }
-.d-reason-wrap,.d-recipe-wrap { grid-area:1 / 1; display:flex; flex-direction:column; min-width:0; }
-.d-reason-wrap { gap:3px; padding:9px 16px 12px; }
-.d-recipe-wrap { gap:4px; padding:9px 16px 12px; }
+.d-detail-toolbar { display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; padding:8px 14px 4px; }
+.d-detail-tabs { display:inline-flex; flex-shrink:0; gap:2px; padding:2px; border:1px solid #ffffff0d; border-radius:6px; background:#080a0d55; }
+.d-detail-tab { display:inline-flex; align-items:center; justify-content:center; min-width:52px; min-height:26px; padding:3px 9px; border:0; border-radius:4px; background:transparent; color:var(--text-muted); font-size:calc(11px * var(--fs-scale)); font-weight:600; line-height:1.4; cursor:pointer; transition:color .18s,background .18s; }
+.d-detail-tab:hover { color:var(--text); background:#ffffff08; }
+.d-detail-tab.is-active { color:var(--accent); background:#efd3a414; box-shadow:inset 0 0 0 1px #efd3a41c; }
+.d-detail-tab:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.d-detail-meta { min-width:0; color:var(--text-muted); font-size:calc(10px * var(--fs-scale)); line-height:1.4; text-align:right; overflow-wrap:anywhere; }
+.d-recipe-meta,.hiddenboard-slot[data-detail-view="recipe"] .d-usage-hint { display:none; }
+.hiddenboard-slot[data-detail-view="recipe"] .d-recipe-meta { display:block; }
+.d-detail-panels { display:grid; grid-template-columns:minmax(0,1fr); min-width:0; }
+.d-reason-wrap,.d-recipe-wrap { grid-area:1 / 1; display:flex; flex-direction:column; min-width:0; gap:2px; padding:2px 14px 9px; }
 .d-detail-panels > [aria-hidden="true"] { visibility:hidden; pointer-events:none; }
-.d-detail-title { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 7px; margin-bottom:4px; font-size:calc(11px * var(--fs-scale)); font-weight:600; line-height:1.5; overflow-wrap:anywhere; }
+.d-reason-wrap:empty::after { content:"사용처 없음"; padding:5px 0; color:var(--text-muted); font-size:calc(11px * var(--fs-scale)); }
 .d-recipe-count { color:var(--text-sub); font-weight:400; white-space:nowrap; }
 .d-recipe-content { display:flex; flex-direction:column; min-width:0; }
 .d-recipe-content .recipe-vertical { gap:5px; }
@@ -75,9 +78,6 @@
 .d-goal-recipe-wrap { display:none; }
 .hiddenboard-slot.is-final-goal .d-goal-recipe-wrap { display:block; }
 .d-goal-recipe-wrap .uc-recipe-area { padding:13px 16px 12px; border-top:1px solid #303139; }
-.d-goal-recipe-wrap .recipe-label { justify-content:space-between; margin-bottom:10px; }
-.d-goal-recipe-wrap .recipe-label::before { flex-shrink:0; }
-.d-goal-recipe-wrap .d-recipe-count { margin-left:auto; font:calc(10px * var(--fs-scale))/1.3 var(--font-mono); letter-spacing:0; color:#e6c89e; }
 .d-reason-tag { display:flex; align-items:center; gap:8px; width:100%; min-width:0; border:0; border-radius:0; padding:5px 0; background:transparent; color:var(--text-sub); text-align:left; font-size:calc(11px * var(--fs-scale)); cursor:pointer; line-height:1.5; transition:color .18s; }
 .d-reason-tag:hover { color:var(--text); }
 .d-reason-tag.is-split-reason,.d-recipe-row { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:baseline; gap:8px; min-width:0; }
@@ -101,8 +101,6 @@
 .hiddenboard-slot.is-final-goal .d-slot-main { padding-bottom:8px; }
 .d-grade-row { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; width:100%; max-width:100%; }
 .d-grade-left { display:flex; align-items:center; flex-wrap:wrap; gap:7px; min-width:0; }
-.d-final-goal-tag { display:inline-flex; align-items:center; justify-content:center; padding:3px 6px; border:1px solid #b49246; border-radius:4px; background:rgba(251,191,36,.10); color:#f5cc70; font-size:calc(9px * var(--fs-scale)); line-height:1.3; white-space:nowrap; }
-.d-final-goal-tag[hidden] { display:none; }
 .d-target-badge { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; margin-left:auto; padding:3px 6px; border:1px solid #f6d47d; border-radius:4px; background:linear-gradient(180deg,#f3d17f,#c79638); color:#241908; font-size:calc(9px * var(--fs-scale)); font-weight:650; line-height:1.3; font-family:inherit; white-space:nowrap; cursor:pointer; box-shadow:0 1px 5px #b387342b,inset 0 1px 0 #fff8d980; transition:background .15s,border-color .15s,color .15s,box-shadow .15s; }
 .d-target-badge[hidden] { display:none; }
 .d-target-badge:hover,.d-target-badge:focus-visible { border-color:#fff2b6; background:linear-gradient(180deg,#ffe6a0,#e9b750); color:#1d1509; box-shadow:0 0 0 2px #ffe7a332,0 3px 15px #edc46740; outline:2px solid #f6d47d; outline-offset:2px; }
@@ -113,10 +111,8 @@
 .d-name-line .d-name-inline { min-width:0; }
 .d-slot-main .uc-notes { margin-top:0; width:100%; }
 .d-slot-main .uc-essence-summary { margin-top:0; width:100%; gap:7px; }
-.hiddenboard-slot:not(.is-final-goal) .d-slot-main .uc-essence-summary { display:none; }
 
 .d-cond-inline { display:none; flex-direction:column; gap:4px; width:100%; min-width:0; padding:13px 16px 12px; border-top:1px solid #303139; color:#e1e7f0; font-size:calc(11px * var(--fs-scale)); line-height:1.65; }
-.d-cond-inline .recipe-label { margin:0 0 2px; }
 .d-condition-row { display:flex; align-items:baseline; justify-content:space-between; gap:8px; width:100%; }
 .d-cond-text { min-width:0; word-break:keep-all; overflow-wrap:anywhere; }
 .d-cond-qty { flex-shrink:0; margin-left:auto; color:var(--text-sub); font:calc(11px * var(--fs-scale))/1.65 var(--font-mono); white-space:nowrap; }
@@ -140,7 +136,7 @@
 .complete-done-label { font-size:10px; color:#bfc5d1; }
 .hiddenboard-slot.is-completed .complete-done-label { display:inline-flex; align-items:center; gap:5px; color:var(--card-state-border); }
 .hiddenboard-slot.is-completed .complete-done-label::before { content:'✓'; font-size:12px; }
-#boardContent.highlight-mode .hiddenboard-slot:not(.highlighted-tree) { opacity:.22; filter:grayscale(1) brightness(.35); }
+#boardContent.highlight-mode .hiddenboard-slot:not(.highlighted-tree) { display:none !important; }
 #boardContent.highlight-mode .hiddenboard-slot.highlighted-tree { opacity:1; filter:none; border-color:var(--card-tone,var(--accent)); }
 #boardContent.highlight-mode .hiddenboard-slot.highlighted-tree.is-completed { border-color:var(--state-border); }
 .empty-msg { display:none; padding:35px 16px; color:#bfc5d1; text-align:center; font-size:12px; line-height:1.7; }
@@ -183,9 +179,9 @@
     .hiddenboard-page { display:contents; }
     .hiddenboard-slot { min-height:116px; scroll-snap-align:none; }
     .hiddenboard-slot:nth-child(3n+1) { scroll-snap-align:start; }
-    .d-detail-tabs { padding:5px 12px 0; }
-    .d-detail-tab { min-height:38px; }
-    .d-reason-wrap,.d-recipe-wrap { padding:8px 12px 10px; }
+    .d-detail-toolbar { padding:6px 12px 3px; }
+    .d-detail-tab { min-height:36px; }
+    .d-reason-wrap,.d-recipe-wrap { padding:2px 12px 8px; }
     .d-goal-recipe-wrap .uc-recipe-area { padding:9px 12px 10px; }
     .d-reason-tag { font-size:calc(11px * var(--fs-scale)); padding:4px 0; }
     .d-reason-tag.is-split-reason,.d-recipe-row { gap:7px; }
@@ -206,3 +202,62 @@
     .hiddenboard-ph-btns .ctrl-btn,.grp-title-actions > .btn-text-link { min-height:44px; padding-top:10px; padding-bottom:10px; }
 }
 @media (prefers-reduced-motion:reduce) { .reset-btn-pending::after { animation:none; } }
+
+/* 클릭/터치 위치 기준 카드 정보 팝오버 */
+.hiddenboard-slot .d-detail-wrap,
+.hiddenboard-slot.is-final-goal .d-goal-recipe-wrap { display:none; }
+.d-card-actions { display:flex; align-items:center; gap:7px; margin-left:auto; flex-shrink:0; }
+.d-info-button { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; padding:5px; border:0; border-radius:0; background:transparent; color:#b9c3d1; cursor:pointer; transition:color .16s,transform .16s; }
+.d-info-button svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; }
+.d-info-button:hover,.d-info-button[aria-expanded="true"] { color:var(--accent); background:transparent; transform:translateX(1px); }
+.d-info-button:focus-visible,.hb-popover-close:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.hb-detail-popover { position:fixed; z-index:10000; box-sizing:border-box; overflow:auto; overscroll-behavior:contain; padding:14px; border:1px solid #66563d; border-radius:12px; background:#191a20; color:var(--text); box-shadow:0 14px 45px #0009,0 2px 8px #0006; }
+.hb-popover-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+.hb-popover-heading strong { font-size:calc(14px * var(--fs-scale)); line-height:1.5; overflow-wrap:anywhere; }
+.hb-popover-close { display:flex; align-items:center; justify-content:center; width:30px; height:30px; flex-shrink:0; padding:0; border:0; border-radius:6px; background:#ffffff07; color:var(--text-sub); font-size:22px; cursor:pointer; }
+.hb-popover-toolbar { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-bottom:9px; margin-bottom:5px; border-bottom:1px solid var(--line); }
+.hb-popover-content { min-width:0; }
+.hb-popover-empty { margin:6px 0 2px; color:var(--text-muted); font-size:12px; }
+.hb-popover-content .recipe-vertical { gap:4px; }
+@media (pointer:coarse) { .d-info-button,.hb-popover-close { width:44px; height:44px; } .hb-detail-popover .d-detail-tab { min-height:40px; } .hb-detail-popover .d-reason-tag { min-height:44px; } }
+
+/* 분리된 사용처·조합법 아이콘과 단일 정보 팝오버 */
+.d-card-actions { gap:5px; }
+.hb-popover-title-group { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.hb-popover-heading strong { color:var(--accent); }
+.hb-popover-unit { color:var(--text-sub); font-size:calc(11px * var(--fs-scale)); line-height:1.5; overflow-wrap:anywhere; }
+.hb-popover-hint { margin:0 0 8px; padding-bottom:8px; border-bottom:1px solid var(--line); color:var(--text-muted); font-size:calc(10px * var(--fs-scale)); }
+
+.hb-popover-footer { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:5px; margin-top:12px; padding-top:10px; border-top:1px solid var(--line); color:var(--text-muted); font-size:calc(10px * var(--fs-scale)); line-height:1.5; }
+.hb-popover-footer kbd { padding:1px 4px; border:1px solid #ffffff20; border-radius:3px; background:#ffffff05; color:var(--text-sub); font:inherit; font-size:calc(9px * var(--fs-scale)); }
+
+/* 추적 해제 버튼 바로 아래의 작은 안내 말풍선 */
+.d-target-control { position:relative; display:inline-flex; flex-shrink:0; }
+.d-tracking-bubble { position:absolute; top:calc(100% + 8px); right:0; z-index:30; display:flex; align-items:center; gap:4px; width:max-content; max-width:calc(100vw - 28px); padding:6px 8px; border:1px solid #726449; border-radius:6px; background:#29251e; color:#e0d7c7; box-shadow:0 3px 10px #0005; font-size:calc(9px * var(--fs-scale)); font-weight:400; line-height:1.5; letter-spacing:0; pointer-events:none; }
+.d-tracking-bubble[hidden] { display:none; }
+.d-tracking-bubble::before { content:""; position:absolute; bottom:100%; right:11px; width:7px; height:7px; border-top:1px solid #726449; border-left:1px solid #726449; background:#29251e; transform:translateY(3px) rotate(45deg); }
+.d-tracking-bubble kbd { padding:0 3px; border:1px solid #ffffff24; border-radius:3px; color:var(--accent); font:inherit; }
+
+.d-info-button.is-tracking { color:#74e4b4; }
+
+
+.d-goal-recipe-wrap .recipe-label { justify-content:space-between; margin-bottom:10px; }
+.d-goal-recipe-wrap .recipe-label::before { flex-shrink:0; }
+.d-goal-recipe-wrap .d-recipe-count { margin-left:auto; font:calc(10px * var(--fs-scale))/1.3 var(--font-mono); letter-spacing:0; color:#e6c89e; }
+.d-cond-inline .recipe-label { margin:0 0 2px; }
+
+.d-condition-goal-count { margin-left:auto; color:var(--text-sub); font:inherit; letter-spacing:0; white-space:nowrap; }
+
+/* 히든보드도 동일한 10px 간격 사용 */
+.d-slot-main,.hiddenboard-slot.is-final-goal .d-slot-main { padding:10px; }
+.d-name { gap:10px; }
+.d-grade-row { position:relative; padding-right:70px; }
+.d-card-actions { position:absolute; top:50%; right:0; transform:translateY(-50%); }
+.d-cond-inline,.craft-wrap,.hiddenboard-slot.is-final-goal .craft-wrap { padding:10px; }
+.d-cond-inline .recipe-label { margin:0 0 10px; }
+@media (pointer:coarse) { .d-grade-row { padding-right:96px; } .d-name-line { padding-right:96px; } }
+.d-slot-main,.d-cond-inline,.craft-wrap,.d-card-actions,.d-grade-left { gap:10px; }
+.d-cond-inline .recipe-label { margin:0; }
+@media (pointer:coarse) { .d-grade-row { padding-right:100px; } .d-name-line { padding-right:100px; } }
+
+.hiddenboard-slot:not(.is-final-goal) .d-slot-main .uc-essence-summary { display:none; }
