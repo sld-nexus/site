@@ -389,7 +389,16 @@
       if(event.key==='Escape'){touchTarget=null;hide();}
       if(event.key==='Enter' || event.key===' '){touchTarget=null;hide();}
     },true);
-    window.addEventListener('resize',function(){hide();mountControlLabels();syncHeaderControlLayout();},{passive:true});
+    var resizeFrame=0,lastLabelWidth=window.innerWidth;
+    window.addEventListener('resize',function(){
+      if(resizeFrame) return;
+      resizeFrame=requestAnimationFrame(function(){
+        resizeFrame=0;
+        if(window.innerWidth===lastLabelWidth) return;
+        lastLabelWidth=window.innerWidth;
+        hide();mountControlLabels();syncHeaderControlLayout();
+      });
+    },{passive:true});
     window.addEventListener('blur',function(){touchTarget=null;hide();});
   }
 

@@ -1,4 +1,10 @@
 (() => {
+    const setHTMLIfChanged = (element, html) => {
+        if (element._lastHTML === html) return;
+        element.innerHTML = html;
+        element._lastHTML = html;
+    };
+
 
     /* ==========================================================================
        01. 공통 설정 및 정책
@@ -230,7 +236,7 @@
     const GRADE_INDEX_MAP = new Map(SYSTEM_CONFIG.grades.order.map((grade, index) => [grade, index]));
     const _boardRequirementsCache = new Map(), _costboardTotalsCache = new Map(), _directInvenboardAtomNeedCache = new Map(), _unitEssencePartsCache = new Map();
     const _hiddenboardSlotElsByUid = new Map(), _unitCardElsByUid = new Map(), _favoriteBtnElsByUid = new Map(), _dirtyUnitCardIds = new Set();
-    let _unitboardDomIndexed = false, _lastUnitboardQtyByUid = new Map();
+    let _unitboardDomIndexed = false, _lastUnitboardStateByUid = new Map();
 
     /* 선택·완료·화면 상태 */
     const _favorites = new Set((() => {
@@ -511,12 +517,17 @@
         }
     }
 
+    let lastSavedPayload = '';
     function saveNexusState() {
         // 나의 조합 독립 창은 원본 저장 데이터를 읽기만 한다.
         if (IS_STANDALONE_BUILD) return;
         try {
             sanitizeRuntimeState();
-            localStorage.setItem(SYSTEM_CONFIG.storageKeys.saveData, JSON.stringify(getPersistedStatePayload()));
+            const payload = JSON.stringify(getPersistedStatePayload());
+            if (payload !== lastSavedPayload) {
+                localStorage.setItem(SYSTEM_CONFIG.storageKeys.saveData, payload);
+                lastSavedPayload = payload;
+            }
         } catch {}
     }
 
@@ -540,8 +551,9 @@
 
     /* 상태 변경·화면 동기화 */
     function debouncedUpdateAllPanels() {
-        if (updateTimer) cancelAnimationFrame(updateTimer);
+        if (updateTimer !== null) return;
         updateTimer = requestAnimationFrame(() => {
+            updateTimer = null;
             let calcResult = calculateBoardRequirements();
             let costboardTotals = _currentViewMode === 'invenboard' ? calculateInvenboardCostboardTotals() : calculateCostboardAtomTotals();
             if (clampCompletedUnits(calcResult, costboardTotals)) {
@@ -1590,23 +1602,30 @@
     function initAllTabContents() {
         const tc = getEl('tabContent');
         if (!tc) return;
-        const categories = SYSTEM_CONFIG.tabs.map(cat => {
-            const items = getUnitboardVisibleItems().filter(u => u.category === cat.key).sort(getUnitboardSort);
-            if (cat.key === '저그중립') {
-                const rightArmIndex = items.findIndex(u => u.id === '데하카의오른팔');
-                const cocoonIndex = items.findIndex(u => u.id === '데하카고치');
-                if (rightArmIndex >= 0 && cocoonIndex >= 0) {
-                    const [rightArm] = items.splice(rightArmIndex, 1);
-                    items.splice(items.findIndex(u => u.id === '데하카고치'), 0, rightArm);
+        const groups = [['favorites', 'favorites'], ...SYSTEM_CONFIG.tabs.map((tab, index) => [tab.key, index])];
+        tc.innerHTML = groups.map(([key, index]) => `<div id="cat-group-${key}" class="cat-group" role="tabpanel" aria-labelledby="tab-btn-${index}"></div>`).join('');
+        _isTabContentInitialized = true;
+        _unitboardDomIndexed = false;
+    }
+
+    // Keep already visited tabs; create cards only when that category is opened.
+    function ensureUnitboardCategory(key) {
+        const group = getEl(`cat-group-${key}`);
+        if (!group || group.dataset.rendered === '1') return;
+        if (key === 'favorites') group.innerHTML = buildUnitboardCollection(key);
+        else {
+            const items = getUnitboardVisibleItems().filter(unit => unit.category === key).sort(getUnitboardSort);
+            if (key === '저그중립') {
+                const arm = items.findIndex(unit => unit.id === '데하카의오른팔');
+                if (arm >= 0 && items.some(unit => unit.id === '데하카고치')) {
+                    const [unit] = items.splice(arm, 1);
+                    items.splice(items.findIndex(unit => unit.id === '데하카고치'), 0, unit);
                 }
             }
-            const bodyHtml = items.length
-                ? buildPagerPages(items.map(item => buildCard(item)), 6, 'unitboard-page unitboard-category-page')
-                : '<div class="unitboard-empty-msg">표시할 유닛이 없습니다.</div>';
-            return `<div id="cat-group-${cat.key}" class="cat-group" role="tabpanel" aria-labelledby="tab-btn-${SYSTEM_CONFIG.tabs.indexOf(cat)}"><div class="unitboard-category-grid">${bodyHtml}</div></div>`;
-        }).join('');
-        tc.innerHTML = ['favorites'].map(key => `<div id="cat-group-${key}" class="cat-group" role="tabpanel" aria-labelledby="tab-btn-${key}">${buildUnitboardCollection(key)}</div>`).join('') + categories;
-        _isTabContentInitialized = true;
+            const body = items.length ? buildPagerPages(items.map(item => buildCard(item)), 6, 'unitboard-page unitboard-category-page') : '<div class="unitboard-empty-msg">표시할 유닛이 없습니다.</div>';
+            group.innerHTML = `<div class="unitboard-category-grid">${body}</div>`;
+        }
+        group.dataset.rendered = '1';
         indexUnitboardDom();
     }
     function indexUnitboardDom() {
@@ -1626,6 +1645,7 @@
 
     function renderCurrentTabContent() {
         if (!_isTabContentInitialized) initAllTabContents();
+        ensureUnitboardCategory(_unitboardCollection || SYSTEM_CONFIG.tabs[_activeTabIdx].key);
         ['favorites'].forEach(key => getEl(`cat-group-${key}`)?.classList.toggle('is-visible', _unitboardCollection === key));
         SYSTEM_CONFIG.tabs.forEach((c, i) => getEl(`cat-group-${c.key}`)?.classList.toggle('is-visible', !_unitboardCollection && i === _activeTabIdx));
         updateTabContentUI();
@@ -1633,9 +1653,13 @@
     function updateTabContentUI() {
         if (!_unitboardDomIndexed) indexUnitboardDom();
         const dirtyIds = new Set(_dirtyUnitCardIds);
-        _lastUnitboardQtyByUid.forEach((_, uid) => dirtyIds.add(uid));
-        activeUnits.forEach((_, uid) => dirtyIds.add(uid));
-        completedTargets.forEach((_, uid) => dirtyIds.add(uid));
+        const nextState = new Map([
+            ...Array.from(activeUnits, ([uid, qty]) => [uid, `active:${qty}`]),
+            ...Array.from(completedTargets, ([uid, qty]) => [uid, `done:${qty}`])
+        ]);
+        new Set([..._lastUnitboardStateByUid.keys(), ...nextState.keys()]).forEach(uid => {
+            if (_lastUnitboardStateByUid.get(uid) !== nextState.get(uid)) dirtyIds.add(uid);
+        });
 
         dirtyIds.forEach(uid => {
             const item = unitMap.get(uid), isActive = activeUnits.has(uid), isFav = _favorites.has(uid);
@@ -1643,14 +1667,16 @@
                 if (!item) return;
                 if (!isOneTime(item)) {
                     const nv = isActive ? String(activeUnits.get(uid)) : '-';
-                    card.querySelectorAll('.ss-val').forEach(v => { if (v.innerText !== nv) v.innerText = nv; });
-                    card.querySelectorAll('.smart-stepper button').forEach(b => { b.disabled = !isActive; });
+                    card.querySelectorAll('.ss-val').forEach(v => { if (v.textContent !== nv) v.textContent = nv; });
+                    card.querySelectorAll('.smart-stepper button').forEach(b => { if (b.disabled !== !isActive) b.disabled = !isActive; });
                 }
-                card.style.display = 'flex';
+                if (card.style.display !== 'flex') card.style.display = 'flex';
                 card.classList.toggle('active', isActive);
-                card.setAttribute('aria-label', `${item.name} · ${isActive ? '선택됨' : '목표 선택'}`);
+                const label = `${item.name} · ${isActive ? '선택됨' : '목표 선택'}`;
+                if (card.getAttribute('aria-label') !== label) card.setAttribute('aria-label', label);
                 const status = card.querySelector('.selection-status-label');
-                if (status) status.textContent = isRestrictedUnit(uid) ? '선택 제한' : isActive ? '선택됨' : '목표 선택';
+                const statusText = isRestrictedUnit(uid) ? '선택 제한' : isActive ? '선택됨' : '목표 선택';
+                if (status && status.textContent !== statusText) status.textContent = statusText;
             });
             (_favoriteBtnElsByUid.get(uid) || []).forEach(btn => {
                 btn.classList.toggle('is-fav', isFav);
@@ -1660,7 +1686,7 @@
                 btn.removeAttribute('title');
             });
         });
-        _lastUnitboardQtyByUid = new Map([...activeUnits, ...completedTargets]);
+        _lastUnitboardStateByUid = nextState;
         _dirtyUnitCardIds.clear();
     }
 
@@ -1675,9 +1701,8 @@
         saveFavorites();
         triggerHaptic();
         const favoritePanel = getEl('cat-group-favorites');
-        if (favoritePanel) favoritePanel.innerHTML = buildUnitboardCollection('favorites');
-        _unitboardDomIndexed = false;
-        indexUnitboardDom();
+        if (favoritePanel) favoritePanel.dataset.rendered = '';
+        _dirtyUnitCardIds.add(id);
         renderCurrentTabContent();
         updateTabsUI();
         if (content) content.scrollTop = scrollTop;
@@ -1893,48 +1918,33 @@
             ['aiur', '아이어', totals.aiur],
             ['zerus', '제루스', totals.zerus]
         ];
-        summaryEl.innerHTML = `<div class="cart-essence-title"><span>정수 합계</span></div><div class="cart-essence-chips">${parts.map(([id, name, value]) => `<span class="cart-essence-chip cart-essence-${id}"><span class="cart-essence-label">${name}</span><span class="cart-essence-value">${value}</span></span>`).join('')}</div>`;
+        setHTMLIfChanged(summaryEl, `<div class="cart-essence-title"><span>정수 합계</span></div><div class="cart-essence-chips">${parts.map(([id, name, value]) => `<span class="cart-essence-chip cart-essence-${id}"><span class="cart-essence-label">${name}</span><span class="cart-essence-value">${value}</span></span>`).join('')}</div>`);
     }
 
     function renderCartPanel(tabBarId, listAreaId, prefix) {
-        const cartListArea = getEl(listAreaId); if (!cartListArea) return;
-        const tabBar = getEl(tabBarId);
-        if (tabBar) {
-            tabBar.innerHTML = getCartTabDefinitions().map(tab => `<button type="button" class="cart-tab-btn ${_cartTab === tab.key ? 'active' : ''}" data-action="switchCartTab" data-tab="${tab.key}">${tab.label} <span class="cart-tab-cnt ${tab.countClass}">${tab.count}</span></button>`).join('');
-        }
-
-        if (_cartTab === 'active') {
-            const actionHtml = `<div class="cart-tab-action-row"><button type="button" class="cart-tab-action-btn" data-action="pauseAllActiveUnits" ${activeUnits.size === 0 ? 'disabled' : ''}>전체 보류</button><button type="button" class="cart-tab-action-btn" data-action="clearCartItems" ${activeUnits.size === 0 ? 'disabled' : ''}>전체 제거</button></div>`;
-            if (activeUnits.size === 0) {
-                const subText = pausedUnits.size > 0 ? '보류 탭에서 복구하면 다시 계산에 포함됩니다.' : '목표 유닛을 선택하면 여기에 표시됩니다.';
-                cartListArea.innerHTML = `${actionHtml}<div class="cart-empty-msg">선택된 유닛이 없습니다.<br><span class="cart-empty-sub">${subText}</span></div>`;
-                return;
-            }
-            const items = getUnitsFromMap(activeUnits);
-            cartListArea.innerHTML = actionHtml + items.map(item => {
-                const qty = activeUnits.get(item.id) || 1;
-                const qtyHtml = !isOneTime(item) ? `<div class="cart-item-stepper"><button type="button" data-action="smartChange" data-uid="${item.id}" data-delta="-1">-</button><span class="ci-val" id="${prefix}-val-${item.id}">${qty}</span><button type="button" data-action="smartChange" data-uid="${item.id}" data-delta="1">+</button></div>` : `<span class="ci-onetime">×${qty}</span>`;
-                return `<div class="cart-item" id="${prefix}-${item.id}"><div class="cart-unit-info"><span class="cart-item-grade"><span class="gtag grade-${item.grade}">${item.grade}</span></span><span class="cart-item-name" ${getUnitNameStyle(item)}>${item.name}</span></div>${qtyHtml}<button type="button" class="cart-item-pause-btn" data-action="pauseCartItem" data-uid="${item.id}">보류</button><button type="button" class="cart-item-del" data-action="removeActiveUnit" data-uid="${item.id}">제거</button></div>`;
-            }).join('');
-            return;
-        }
-
-        if (_cartTab === 'paused') {
-            const actionHtml = `<div class="cart-tab-action-row"><button type="button" class="cart-tab-action-btn" data-action="restoreAllPausedUnits" ${pausedUnits.size === 0 ? 'disabled' : ''}>보류 복구</button><button type="button" class="cart-tab-action-btn" data-action="clearCartItems" ${pausedUnits.size === 0 ? 'disabled' : ''}>전체 제거</button></div>`;
-            if (pausedUnits.size === 0) {
-                cartListArea.innerHTML = `${actionHtml}<div class="cart-empty-msg">보류된 유닛이 없습니다.<br><span class="cart-empty-sub">선택 탭의 보류 버튼을 누르면 이곳으로 이동됩니다.</span></div>`;
-                return;
-            }
-            cartListArea.innerHTML = actionHtml + getUnitsFromMap(pausedUnits).map(item => `<div class="cart-item cart-item-paused" id="${prefix}p-${item.id}"><div class="cart-unit-info"><span class="cart-item-grade"><span class="gtag grade-${item.grade}">${item.grade}</span></span><span class="cart-item-name" ${getUnitNameStyle(item)}>${item.name}</span></div>${!isOneTime(item) ? `<span class="ci-onetime">×${pausedUnits.get(item.id) || 1}</span>` : ''}<button type="button" class="cart-done-restore-hint" data-action="restorePausedUnit" data-uid="${item.id}">복구</button><button type="button" class="cart-item-del" data-action="removePausedUnit" data-uid="${item.id}">제거</button></div>`).join('');
-            return;
-        }
-
-        const actionHtml = `<div class="cart-tab-action-row"><button type="button" class="cart-tab-action-btn" data-action="restoreAllCompletedUnits" ${completedTargets.size === 0 ? 'disabled' : ''}>완료 복구</button><button type="button" class="cart-tab-action-btn" data-action="clearCartItems" ${completedTargets.size === 0 ? 'disabled' : ''}>전체 제거</button></div>`;
-        if (completedTargets.size === 0) {
-            cartListArea.innerHTML = `${actionHtml}<div class="cart-empty-msg">완료된 유닛이 없습니다.<br><span class="cart-empty-sub">목표 완료 시 이곳으로 이동됩니다.</span></div>`;
-            return;
-        }
-        cartListArea.innerHTML = actionHtml + getUnitsFromMap(completedTargets).map(item => `<div class="cart-item cart-item-done" id="${prefix}d-${item.id}"><div class="cart-unit-info"><span class="cart-item-grade"><span class="gtag grade-${item.grade}">${item.grade}</span></span><span class="cart-item-name done-name" ${getUnitNameStyle(item)}>${item.name}</span></div><span class="ci-onetime">×${completedTargets.get(item.id) || 1}</span><button type="button" class="cart-done-restore-hint" data-action="restoreUnit" data-uid="${item.id}">복구</button><button type="button" class="cart-item-del" data-action="removeCompletedUnit" data-uid="${item.id}">제거</button></div>`).join('');
+        const list = getEl(listAreaId), tabBar = getEl(tabBarId);
+        if (!list) return;
+        if (tabBar) setHTMLIfChanged(tabBar, getCartTabDefinitions().map(tab => `<button type="button" class="cart-tab-btn ${_cartTab === tab.key ? 'active' : ''}" data-action="switchCartTab" data-tab="${tab.key}">${tab.label} <span class="cart-tab-cnt ${tab.countClass}">${tab.count}</span></button>`).join(''));
+        const active = _cartTab === 'active', paused = _cartTab === 'paused';
+        const source = getCurrentCartUnitMap();
+        const meta = active
+            ? ['pauseAllActiveUnits', '전체 보류', '선택된 유닛이 없습니다.', pausedUnits.size > 0 ? '보류 탭에서 복구하면 다시 계산에 포함됩니다.' : '목표 유닛을 선택하면 여기에 표시됩니다.', '', '']
+            : paused
+                ? ['restoreAllPausedUnits', '보류 복구', '보류된 유닛이 없습니다.', '선택 탭의 보류 버튼을 누르면 이곳으로 이동됩니다.', 'p', ' cart-item-paused']
+                : ['restoreAllCompletedUnits', '완료 복구', '완료된 유닛이 없습니다.', '목표 완료 시 이곳으로 이동됩니다.', 'd', ' cart-item-done'];
+        const disabled = source.size === 0 ? 'disabled' : '';
+        const actions = `<div class="cart-tab-action-row"><button type="button" class="cart-tab-action-btn" data-action="${meta[0]}" ${disabled}>${meta[1]}</button><button type="button" class="cart-tab-action-btn" data-action="clearCartItems" ${disabled}>전체 제거</button></div>`;
+        const rows = getUnitsFromMap(source).map(item => {
+            const qty = source.get(item.id) || 1, oneTime = isOneTime(item);
+            const quantity = active && !oneTime
+                ? `<div class="cart-item-stepper"><button type="button" data-action="smartChange" data-uid="${item.id}" data-delta="-1">-</button><span class="ci-val" id="${prefix}-val-${item.id}">${qty}</span><button type="button" data-action="smartChange" data-uid="${item.id}" data-delta="1">+</button></div>`
+                : paused && oneTime ? '' : `<span class="ci-onetime">×${qty}</span>`;
+            const control = active
+                ? `<button type="button" class="cart-item-pause-btn" data-action="pauseCartItem" data-uid="${item.id}">보류</button>`
+                : `<button type="button" class="cart-done-restore-hint" data-action="${paused ? 'restorePausedUnit' : 'restoreUnit'}" data-uid="${item.id}">복구</button>`;
+            return `<div class="cart-item${meta[5]}" id="${prefix}${meta[4]}-${item.id}"><div class="cart-unit-info"><span class="cart-item-grade"><span class="gtag grade-${item.grade}">${item.grade}</span></span><span class="cart-item-name${!active && !paused ? ' done-name' : ''}" ${getUnitNameStyle(item)}>${item.name}</span></div>${quantity}${control}<button type="button" class="cart-item-del" data-action="${active ? 'removeActiveUnit' : paused ? 'removePausedUnit' : 'removeCompletedUnit'}" data-uid="${item.id}">제거</button></div>`;
+        }).join('');
+        setHTMLIfChanged(list, actions + (rows || `<div class="cart-empty-msg">${meta[2]}<br><span class="cart-empty-sub">${meta[3]}</span></div>`));
     }
 
     function updateCartUI() {
@@ -2027,7 +2037,7 @@
         const isEmpty = activeUnits.size === 0 && completedTargets.size === 0;
         if (isEmpty) {
             msg.style.display = 'block';
-            msg.innerHTML = `<div class="empty-msg-enhanced"><div class="empty-main">유닛도감에서 유닛을 선택하세요</div></div>`;
+            setHTMLIfChanged(msg, `<div class="empty-msg-enhanced"><div class="empty-main">유닛도감에서 유닛을 선택하세요</div></div>`);
         } else {
             msg.style.display = 'none';
         }

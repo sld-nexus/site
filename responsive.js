@@ -28,17 +28,27 @@ window.NEXUS_RESPONSIVE = function createResponsive(ctx) {
             : isPortraitDesktop && pixelWidth >= 1439 && pixelHeight >= 2559 ? '3' : '';
         document.documentElement.dataset.pivotColumns = columns;
     }
+    let viewportFrame = null, viewportKey = '';
+    const desktopQuery = window.matchMedia('(min-width:1025px) and (min-aspect-ratio:11/10) and (hover:hover) and (pointer:fine)');
     const handleViewportChange = () => {
-        syncInvenboardNav();
-        updatePivotColumns();
-        ctx.hideRecipeTooltip();
-        ctx.closeFontSizePopup();
-        ctx.placeHiddenboardControls();
-        ctx.updateBoardHeader();
+        if (viewportFrame !== null) return;
+        viewportFrame = requestAnimationFrame(() => {
+            viewportFrame = null;
+            const key = `${window.innerWidth}:${desktopQuery.matches}:${window.screen.width}:${window.screen.height}:${window.devicePixelRatio}`;
+            if (key === viewportKey) return;
+            viewportKey = key;
+            syncInvenboardNav();
+            updatePivotColumns();
+            ctx.hideRecipeTooltip();
+            ctx.closeFontSizePopup();
+            ctx.placeHiddenboardControls();
+            ctx.updateBoardHeader();
+        });
     };
     window.addEventListener('orientationchange', handleViewportChange);
     window.addEventListener('resize', handleViewportChange);
     window.addEventListener('focus', updatePivotColumns);
+    desktopQuery.addEventListener('change', handleViewportChange);
 
     /* 화면 스와이프 이벤트 */
     function bindSwipeEvents() {

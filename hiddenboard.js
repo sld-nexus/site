@@ -1,6 +1,12 @@
 /* 기능 모듈 — V39 공통 상태·계산·저장은 app.js 단일 원본을 사용합니다. */
 window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
     'use strict';
+    const setHTMLIfChanged = (element, html) => {
+        if (element._lastHTML === html) return;
+        element.innerHTML = html;
+        element._lastHTML = html;
+    };
+
     function getGroupRestoreDescription(level) {
         if (level >= 5) return '완료된 목표를 선택 목록으로 돌리고, 모든 재료의 완료·보유량을 초기화합니다. 보류 목록은 유지합니다.';
         if (level >= 4) return '직속·히든·기본 재료의 완료 상태를 함께 복구합니다. 목표와 보류 목록은 유지합니다.';
@@ -187,11 +193,11 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         const slotEl = ctx._hiddenboardSlotElsByUid.get(id);
         if (!slotEl || slotEl.classList.contains('is-final-goal')) return;
         const activeView = view === 'recipe' ? 'recipe' : 'usage';
-        slotEl.dataset.detailView = activeView;
+        if (slotEl.dataset.detailView !== activeView) slotEl.dataset.detailView = activeView;
         slotEl.querySelectorAll('.d-detail-tab').forEach(tab => {
             const selected = tab.dataset.detailView === activeView;
             tab.classList.toggle('is-active', selected);
-            tab.setAttribute('aria-pressed', String(selected));
+            if (tab.getAttribute('aria-pressed') !== String(selected)) tab.setAttribute('aria-pressed', String(selected));
         });
         // 두 패널의 높이를 함께 확보하여 탭 전환에도 카드와 하단 버튼 정렬을 유지합니다.
         // 클릭할 수 있는 상위조합 태그는 선택된 탭에서만 활성화합니다.
@@ -200,8 +206,8 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
             [slotEl.querySelector('.d-recipe-wrap'), activeView === 'recipe']
         ]) {
             if (!panel) continue;
-            panel.setAttribute('aria-hidden', String(!selected));
-            panel.inert = !selected;
+            if (panel.getAttribute('aria-hidden') !== String(!selected)) panel.setAttribute('aria-hidden', String(!selected));
+            if (panel.inert !== !selected) panel.inert = !selected;
         }
         renderHiddenboardRecipe(slotEl, calcResult);
     }
@@ -232,21 +238,31 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         }
     }
 
-    function wrapHiddenboardGridPages(grid, pageSize, onlyVisible = false) {
-        if (!grid) return;
-        const items = Array.from(grid.children).filter(el =>
-            el.classList.contains('hiddenboard-slot') && (!onlyVisible || el.style.display !== 'none')
-        );
-        if (items.length === 0) return;
-        const size = Math.max(1, pageSize || items.length);
-        const frag = document.createDocumentFragment();
-        for (let i = 0; i < items.length; i += size) {
-            const page = document.createElement('div');
-            page.className = 'hiddenboard-page';
-            items.slice(i, i + size).forEach(el => page.appendChild(el));
-            frag.appendChild(page);
+    // Reconcile existing nodes rather than detaching every card on each update.
+    function reconcileChildren(parent, children) {
+        let cursor = parent.firstElementChild;
+        for (const child of children) {
+            if (child === cursor) cursor = cursor.nextElementSibling;
+            else parent.insertBefore(child, cursor);
         }
-        grid.appendChild(frag);
+        while (cursor) { const next = cursor.nextElementSibling; cursor.remove(); cursor = next; }
+    }
+
+    function updateGridPages(grid, items, onlyVisible) {
+        const key = items.map(el => `${el.id}:${onlyVisible && el.style.display === 'none' ? 0 : 1}`).join('|');
+        if (grid._pageKey === key) return;
+        const shown = onlyVisible ? items.filter(el => el.style.display !== 'none') : items;
+        const hidden = onlyVisible ? items.filter(el => el.style.display === 'none') : [];
+        const pages = Array.from(grid.children).filter(el => el.classList.contains('hiddenboard-page'));
+        const nextPages = [];
+        for (let i = 0; i < shown.length; i += 6) {
+            const page = pages[i / 6] || document.createElement('div');
+            page.className = 'hiddenboard-page';
+            reconcileChildren(page, shown.slice(i, i + 6));
+            nextPages.push(page);
+        }
+        reconcileChildren(grid, [...hidden, ...nextPages]);
+        grid._pageKey = key;
     }
 
     // 조합 진행도 차감을 적용한 상위조합 수량: 화면 표시 전용 계산.
@@ -317,17 +333,17 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
                         (a[1]._reasonOrder || 0) - (b[1]._reasonOrder || 0)
                     );
                     rCon.classList.toggle('is-target-only', sorted.every(([, info]) => info.depth === 0));
-                    rCon.innerHTML = sorted.map(([rId, info]) => {
+                    setHTMLIfChanged(rCon, sorted.map(([rId, info]) => {
                         const splitTagClass = isSplitReason(info) ? ' is-split-reason' : '';
                         return `<button type="button" class="d-reason-tag ${getReasonTagClass(info)}${splitTagClass}" data-action="toggleHighlight" data-uid="${rId.replace(/^(TARGET_|MAT_|TOOL_|AUTO_)/,'')}">${renderReasonTagContent(info)}</button>`;
-                    }).join('');
+                    }).join(''));
                 } else {
                     rCon.classList.remove('is-target-only');
-                    rCon.innerHTML = '';
+                    setHTMLIfChanged(rCon, '');
                 }
             } else {
                 rCon.classList.remove('is-target-only');
-                rCon.innerHTML = '';
+                setHTMLIfChanged(rCon, '');
             }
         }
 
@@ -351,10 +367,10 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
 
             if (condMap.size > 0) {
                 cEl.style.display = 'flex';
-                cEl.innerHTML = '<span class="recipe-label">조합 조건</span>' + Array.from(condMap, ([condStr, qty]) => `<div class="d-condition-row"><span class="d-cond-text">${ctx.escapeHtml(condStr)}</span><span class="d-cond-qty">${qty}개</span></div>`).join('');
+                setHTMLIfChanged(cEl, '<span class="recipe-label">조합 조건</span>' + Array.from(condMap, ([condStr, qty]) => `<div class="d-condition-row"><span class="d-cond-text">${ctx.escapeHtml(condStr)}</span><span class="d-cond-qty">${qty}개</span></div>`).join(''));
             } else {
                 cEl.style.display = 'none';
-                cEl.innerHTML = '';
+                setHTMLIfChanged(cEl, '');
             }
         }
     }
@@ -407,10 +423,10 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         return exactDepths;
     }
 
-    function sortHiddenboardGrids(grids) {
+    function sortHiddenboardGrids(grids, slotsByGrid, onlyVisible) {
         [grids.target, grids.special, grids.upperHidden, grids.basicHidden].forEach(grid => {
             if (!grid) return;
-            const children = Array.from(grid.children);
+            const children = slotsByGrid.get(grid) || [];
             children.sort((a, b) => {
                 const uidA = a.dataset.uid || a.id.replace('d-slot-wrap-','');
                 const uidB = b.dataset.uid || b.id.replace('d-slot-wrap-','');
@@ -424,7 +440,7 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
                        (ctx.SYSTEM_CONFIG.sorting.order[uB?.name]||0) - (ctx.SYSTEM_CONFIG.sorting.order[uA?.name]||0) ||
                        (uA?.name || uidA).localeCompare(uB?.name || uidB);
             });
-            children.forEach(el => grid.appendChild(el));
+            updateGridPages(grid, children, onlyVisible);
         });
     }
 
@@ -480,6 +496,7 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
 
     function updateHiddenboard(calcResult) {
         if (!ctx._isHiddenboardRendered) return;
+        const board = ctx.getEl('boardContent'), scrollTop = board?.scrollTop || 0;
         const { reqMap, baseMap, reasonMap } = calcResult || ctx.calculateBoardRequirements();
         const mergedSlots = new Set();
 
@@ -509,12 +526,8 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
 
         const exactDepths = getHiddenboardDepths(mergedSlots);
 
-        ctx._hiddenboardSlotElsByUid.forEach(el => {
-            el.style.display = 'none'; el.classList.remove('is-visible','has-target','is-completed','highlighted-tree');
-            if (pool && el.parentElement !== pool) pool.appendChild(el);
-        });
-        ctx.getEl('boardContent')?.querySelectorAll('.hiddenboard-page').forEach(el => el.remove());
-        const gridFragments = new Map(Object.values(grids).filter(Boolean).map(grid => [grid, document.createDocumentFragment()]));
+        const slotsByGrid = new Map(Object.values(grids).filter(Boolean).map(grid => [grid, []]));
+        const usedSlots = new Set();
         const reasonEntriesCache = new Map();
         const getCachedReasonEntries = (slotId, rMap) => {
             if (!reasonEntriesCache.has(slotId)) reasonEntriesCache.set(slotId, getHiddenboardReasonDisplayEntries(slotId, rMap, reqMap));
@@ -603,8 +616,8 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
                 if (!isCompleted) {
                     const tenDisabled = needed >= 10 ? '' : ' disabled';
                     const qtyButtons = isFinalGoal ? '' : `<button type="button" class="pc-btn" data-action="addComplete" data-uid="${id}" data-batch="1"><span class="batch-plus" aria-hidden="true">+</span>1개</button><button type="button" class="pc-btn" data-action="addComplete" data-uid="${id}" data-batch="10"${tenDisabled}><span class="batch-plus" aria-hidden="true">+</span>10개</button>`;
-                    cWrap.innerHTML = `<div class="craft-wrap-left"><span class="req-text">${needed}</span><span class="req-label">개</span></div><div class="craft-wrap-right">${qtyButtons}<button type="button" class="btn-complete" data-action="completeUnit" data-uid="${id}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m5 12 4 4 10-10"/></svg>완료</button></div>`;
-                } else cWrap.innerHTML = `<div class="craft-wrap-left"><span class="req-text">0</span><span class="req-label">개</span></div><div class="craft-wrap-right"><span class="complete-done-label">완료됨</span></div>`;
+                    setHTMLIfChanged(cWrap, `<div class="craft-wrap-left"><span class="req-text">${needed}</span><span class="req-label">개</span></div><div class="craft-wrap-right">${qtyButtons}<button type="button" class="btn-complete" data-action="completeUnit" data-uid="${id}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m5 12 4 4 10-10"/></svg>완료</button></div>`);
+                } else setHTMLIfChanged(cWrap, `<div class="craft-wrap-left"><span class="req-text">0</span><span class="req-label">개</span></div><div class="craft-wrap-right"><span class="complete-done-label">완료됨</span></div>`);
             }
 
             const gridId = tGrid?.id || '';
@@ -619,8 +632,10 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
                 } else {
                     slotEl.classList.remove('is-visible');
                 }
-                slotEl.style.display = hideT ? 'none' : ''; // 표시 레이아웃은 CSS(PC 공통 행 / 모바일 flex)에 맡깁니다.
-                (gridFragments.get(tGrid) || tGrid).appendChild(slotEl);
+                const display = hideT ? 'none' : '';
+                if (slotEl.style.display !== display) slotEl.style.display = display;
+                slotsByGrid.get(tGrid).push(slotEl);
+                usedSlots.add(slotEl);
             }
 
             
@@ -635,11 +650,13 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
             .sort(ctx.compareUnitByHiddenboardPriority)
             .forEach(u => processSlot(u.id));
 
-        gridFragments.forEach((frag, grid) => { if (frag.childNodes.length > 0) grid.appendChild(frag); });
-
-        sortHiddenboardGrids(grids);
-
-        Object.values(grids).forEach(g => wrapHiddenboardGridPages(g, 6, !!targetHighlight));
+        ctx._hiddenboardSlotElsByUid.forEach(el => {
+            if (usedSlots.has(el)) return;
+            if (el.style.display !== 'none') el.style.display = 'none';
+            el.classList.remove('is-visible', 'has-target', 'is-completed', 'highlighted-tree');
+            if (pool && el.parentElement !== pool) pool.appendChild(el);
+        });
+        sortHiddenboardGrids(grids, slotsByGrid, !!targetHighlight);
 
         updateHiddenboardGroupVisibility(grids, targetHighlight, excludeGridIds);
 
@@ -649,6 +666,7 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
             el.classList.toggle('highlighted-tree', !!ctx._currentHighlight && highlightDeps?.has(cleanId));
         });
         updateGroupRestoreButtons();
+        if (board && board.scrollTop !== scrollTop) board.scrollTop = scrollTop;
     }
 
     function getHiddenboardRecipeCompletionCandidates(baseMap) {

@@ -563,3 +563,7 @@ body .nexus-labelled-control[hidden]{display:none!important}
 .uc-recipe-area,.uc-ctrl-area { padding:10px; }
 .recipe-label { margin-bottom:10px; }
 .unit-card .recipe-vertical,.uc-meta-row,.uc-ctrl-area { gap:10px; }
+
+@media (min-width:1025px) and (min-aspect-ratio:11/10) and (hover:hover) and (pointer:fine) {
+    #tabContent,#boardContent,.build-inspector { overscroll-behavior-y:contain; }
+}

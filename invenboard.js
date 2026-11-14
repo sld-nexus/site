@@ -1,6 +1,12 @@
 /* 기능 모듈 — V39 공통 상태·계산·저장은 app.js 단일 원본을 사용합니다. */
 window.NEXUS_INVEN = function createInvenboard(ctx) {
     'use strict';
+    const setHTMLIfChanged = (element, html) => {
+        if (element._lastHTML === html) return;
+        element.innerHTML = html;
+        element._lastHTML = html;
+    };
+
     /* 재료보드 입력·보유량·완료 처리 */
 
     function getInvenboardAtoms() {
@@ -106,7 +112,7 @@ window.NEXUS_INVEN = function createInvenboard(ctx) {
     function updateInvenboardSlotModeButton() {
         const btn = ctx.getEl('invenboardSlotModeBtn');
         if (!btn) return;
-        btn.innerHTML = `<span>${ctx._isInvenboardSlotsExpanded ? '핵심재료 전환' : '전체재료 전환'}</span><span class="board-action-icon" aria-hidden="true">▦</span>`;
+        setHTMLIfChanged(btn, `<span>${ctx._isInvenboardSlotsExpanded ? '핵심재료 전환' : '전체재료 전환'}</span><span class="board-action-icon" aria-hidden="true">▦</span>`);
         btn.setAttribute('aria-pressed', String(ctx._isInvenboardSlotsExpanded));
         btn.title = ctx._isInvenboardSlotsExpanded ? '현재 전체 재료 표시 · 핵심재료로 전환' : '현재 핵심재료 표시 · 전체재료로 전환';
         btn.classList.toggle('is-expanded', ctx._isInvenboardSlotsExpanded);
@@ -505,7 +511,7 @@ window.NEXUS_INVEN = function createInvenboard(ctx) {
 
         const modeBtn = ctx.getEl('invenboardInputModeBtn');
         if (modeBtn) {
-            modeBtn.innerHTML = `<span>${isManual ? '자동입력 전환' : '수동입력 전환'}</span><span class="board-action-icon" aria-hidden="true">⇄</span>`;
+            setHTMLIfChanged(modeBtn, `<span>${isManual ? '자동입력 전환' : '수동입력 전환'}</span><span class="board-action-icon" aria-hidden="true">⇄</span>`);
             modeBtn.setAttribute('aria-pressed', String(isManual));
             modeBtn.title = isManual ? '현재 수동입력 · 자동입력으로 전환' : '현재 자동입력 · 수동입력으로 전환';
             modeBtn.classList.toggle('is-manual', isManual);
@@ -517,7 +523,7 @@ window.NEXUS_INVEN = function createInvenboard(ctx) {
         if (empty) {
             const isEmpty = ctx.activeUnits.size === 0 && ctx.completedTargets.size === 0;
             empty.style.display = isEmpty ? 'block' : 'none';
-            if (isEmpty) empty.innerHTML = `<div class="empty-msg-enhanced"><div class="empty-main">유닛도감에서 유닛을 선택하세요</div></div>`;
+            if (isEmpty) setHTMLIfChanged(empty, `<div class="empty-msg-enhanced"><div class="empty-main">유닛도감에서 유닛을 선택하세요</div></div>`);
         }
     }
     return { calculateInvenboardCostboardTotals, changeInvenboardAmount, completeAllInvenboardUnits, completeInvenboardTargetsIfReady, getInvenboardAtoms, renderInvenboard, resetInvenboardAmounts, setInvenboardAmount, toggleInvenboardInputMode, toggleInvenboardSlotMode, updateInvenboard };
