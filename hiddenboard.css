@@ -66,9 +66,10 @@
 .d-detail-meta { min-width:0; color:var(--text-muted); font-size:calc(10px * var(--fs-scale)); line-height:1.4; text-align:right; overflow-wrap:anywhere; }
 .d-recipe-meta,.hiddenboard-slot[data-detail-view="recipe"] .d-usage-hint { display:none; }
 .hiddenboard-slot[data-detail-view="recipe"] .d-recipe-meta { display:block; }
-.d-detail-panels { display:grid; grid-template-columns:minmax(0,1fr); min-width:0; max-height:140px; overflow-y:auto; overscroll-behavior:contain; }
+/* 카드 내부에는 스크롤을 만들지 않고 모든 내용을 바깥 보드에 표시한다. */
+.d-detail-panels { display:block; min-width:0; max-height:none; overflow:visible; }
 .d-reason-wrap,.d-recipe-wrap { grid-area:1 / 1; display:flex; flex-direction:column; min-width:0; gap:2px; padding:2px 14px 9px; }
-.d-detail-panels > [aria-hidden="true"] { visibility:hidden; pointer-events:none; }
+.d-detail-panels > [aria-hidden="true"] { display:none; }
 .d-reason-wrap:empty::after { content:"상위조합 없음"; padding:5px 0; color:var(--text-muted); font-size:calc(11px * var(--fs-scale)); }
 .d-recipe-count { color:var(--text-sub); font-weight:400; white-space:nowrap; }
 .d-recipe-content { display:flex; flex-direction:column; min-width:0; }
@@ -183,10 +184,10 @@
     .hiddenboard-group-title { flex-wrap:wrap; padding:0 0 10px; }
     .grp-title-main { font-size:13px; }
     .grp-title-actions { margin-left:auto; }
-    .hiddenboard-grid { grid-template-columns:none; grid-template-rows:repeat(3,auto); grid-auto-flow:column; grid-auto-columns:100%; gap:8px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; padding-bottom:8px; }
+    .hiddenboard-grid { grid-template-columns:none; grid-template-rows:repeat(2,auto); grid-auto-flow:column; grid-auto-columns:100%; gap:8px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; padding-bottom:8px; }
     .hiddenboard-page { display:contents; }
     .hiddenboard-slot { min-height:116px; scroll-snap-align:none; }
-    .hiddenboard-slot:nth-child(3n+1) { scroll-snap-align:start; }
+    .hiddenboard-slot:nth-child(2n+1) { scroll-snap-align:start; }
     .d-detail-toolbar { padding:6px 12px 3px; }
     .d-detail-tab { min-height:36px; }
     .d-reason-wrap,.d-recipe-wrap { padding:2px 12px 8px; }

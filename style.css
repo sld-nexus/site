@@ -374,14 +374,14 @@ html.nexus-standalone-build,html.nexus-standalone-build body { height:auto; min-
     .unitboard-page { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:repeat(3,auto); gap:7px; min-width:0; scroll-snap-align:start; align-items:stretch; }
     .unitboard-fav-page { grid-template-rows:repeat(1,auto); }
 }
-/* 모바일은 원본처럼 가로 1장 · 세로 3장씩 넘기는 카드 구성 */
+/* 모바일은 가로 1장 · 세로 2장씩 넘기는 카드 구성 */
 @media (max-width:767px),
        (min-width:768px) and (max-width:950px) and (max-height:520px) and (orientation:landscape) {
-    .unitboard-category-grid,.unitboard-fav-grid { display:grid; grid-template-columns:none; grid-template-rows:repeat(3,auto); grid-auto-flow:column; grid-auto-columns:100%; gap:8px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; scroll-padding-inline:8px; padding:7px 8px 14px; -webkit-overflow-scrolling:touch; }
+    .unitboard-category-grid,.unitboard-fav-grid { display:grid; grid-template-columns:none; grid-template-rows:repeat(2,auto); grid-auto-flow:column; grid-auto-columns:100%; gap:8px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; scroll-padding-inline:8px; padding:7px 8px 14px; -webkit-overflow-scrolling:touch; }
     .unitboard-fav-grid { grid-template-rows:repeat(1,auto); }
     .unitboard-page { display:contents; }
     .unit-card { width:100%; min-width:0; min-height:185px; scroll-snap-align:none; }
-    .unitboard-category-grid .unit-card:nth-child(3n+1),.unitboard-fav-grid .unit-card { scroll-snap-align:start; }
+    .unitboard-category-grid .unit-card:nth-child(2n+1),.unitboard-fav-grid .unit-card { scroll-snap-align:start; }
     .uc-card-inner { display:flex; flex-direction:column; height:100%; min-height:0; }
     .uc-head { padding:11px 13px 9px; min-width:0; }
     .uc-meta-row { gap:5px; margin-bottom:6px; flex-wrap:wrap; }
