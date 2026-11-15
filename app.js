@@ -1507,75 +1507,11 @@
                 : '<span>전체 선택</span><span class="action-icon" aria-hidden="true">+</span>';
         }
     }
+    /* ── 10-B · 카드 정보·즐겨찾기·선택 UI 생성 ── */
     function starBtnHtml(id) {
         const isFav = _favorites.has(id), name = unitMap.get(id)?.name || id;
         return `<button type="button" class="uc-fav-btn${isFav ? ' is-fav' : ''}" data-action="toggleFavorite" data-uid="${id}" aria-pressed="${isFav}" aria-label="${escapeHtml(name)} 즐겨찾기 ${isFav ? '해제' : '추가'}">${isFav ? '★' : '☆'}</button>`;
     }
-    /* 유닛도감 카드 정보 복사: 화면에 표시된 정보만 텍스트로 옮긴다. */
-    function copyUnitButtonHtml(item) {
-        return `<button type="button" class="uc-copy-btn" data-action="copyUnitCard" data-uid="${item.id}" aria-label="${escapeHtml(item.name)} 정보 복사" title="유닛 정보 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></button>`;
-    }
-
-    function getUnitCardCopyText(card) {
-        const read = element => String(element?.innerText || element?.textContent || '').replace(/\s+/g, ' ').trim();
-        const name = read(card.querySelector('.uc-name-row'));
-        const notes = [...card.querySelectorAll('.uc-note')].map(read).filter(Boolean)
-            .map(text => text.replace(/^능력\s*:\s*/, '능력: '));
-        const essence = [...card.querySelectorAll('.uc-essence-summary .uc-essence-chip')]
-            .map(chip => [...chip.children].map(read).filter(Boolean).join(' '));
-        const recipe = [...card.querySelectorAll('.uc-recipe-area .recipe-vertical > *')].map(row => {
-            const unitName = read(row.querySelector('.recipe-badge-name'));
-            if (!unitName) return read(row);
-            const grade = read(row.querySelector('.d-reason-grade'));
-            const tool = read(row.querySelector('.tool-badge'));
-            const conditions = [...row.querySelectorAll('.badge-cond')].map(read).filter(Boolean);
-            if (row.querySelector('.badge-special-cond')) conditions.push('특수조건');
-            const quantity = read(row.querySelector('.badge-qty')).replace(/^·\s*/, '');
-            return [`${grade ? '[' + grade + '] ' : ''}${unitName}${tool ? ' ' + tool : ''}`,
-                ...conditions, quantity].filter(Boolean).join(' · ');
-        });
-        const special = [...card.querySelectorAll('.uc-recipe-area .tsc-item')].map(read).filter(Boolean);
-        // 한 줄 입력란이 줄바꿈을 제거해도 항목 경계를 유지한다.
-        return [`유닛명: ${name}`, ...notes,
-            `정수 정보: ${essence.length ? essence.join(' / ') : '없음'}`,
-            `조합 조건: ${recipe.length ? recipe.join(' / ') : '정보 없음'}`,
-            ...(special.length ? ['특수 조건: ' + special.join(' / ')] : [])].join(' | ');
-    }
-
-    function copyUnitTextFallback(text) {
-        const previousFocus = document.activeElement;
-        const field = document.createElement('textarea');
-        field.value = text;
-        field.readOnly = true;
-        field.tabIndex = -1;
-        field.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;padding:0;border:0;opacity:0;';
-        document.body.appendChild(field);
-        try {
-            field.focus({ preventScroll: true });
-            field.select();
-            field.setSelectionRange(0, text.length);
-            return document.execCommand('copy');
-        } finally {
-            field.remove();
-            previousFocus?.focus?.({ preventScroll: true });
-        }
-    }
-
-    async function copyUnitCard(trigger) {
-        const card = trigger.closest('.unit-card');
-        if (!card) return;
-        const text = getUnitCardCopyText(card);
-        const name = card.querySelector('.uc-name-row')?.textContent || '유닛';
-        let copied = false;
-        try {
-            if (navigator.clipboard?.writeText && window.isSecureContext) {
-                try { await navigator.clipboard.writeText(text); copied = true; }
-                catch { copied = copyUnitTextFallback(text); }
-            } else copied = copyUnitTextFallback(text);
-        } catch { copied = false; }
-        showActionFeedback(copied ? `${name} 정보 복사됨 ✓` : '복사하지 못했습니다. 브라우저의 클립보드 권한을 확인해주세요.');
-    }
-
     function buildCardControl(item, prefix, isRestricted, isOT) {
         const selection = `<span class="uc-selection-state"><span class="selection-check" aria-hidden="true">✓</span><span class="selection-status-label">목표 선택</span></span>`;
         const control = !isOT && !isRestricted
@@ -1631,6 +1567,73 @@
             `${buildCardControl(item, prefix, isRestricted, isOT)}</div></article>`;
     }
 
+    /* ── 10-C · 유닛 정보 복사 ── */
+    /* 10-C-1 · 버튼 마크업 */
+    function copyUnitButtonHtml(item) {
+        return `<button type="button" class="uc-copy-btn" data-action="copyUnitCard" data-uid="${item.id}" aria-label="${escapeHtml(item.name)} 정보 복사" title="유닛 정보 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></button>`;
+    }
+
+    /* 10-C-2 · 표시 정보 수집·텍스트 구분자 구성 */
+    function getUnitCardCopyText(card) {
+        const read = element => String(element?.innerText || element?.textContent || '').replace(/\s+/g, ' ').trim();
+        const name = read(card.querySelector('.uc-name-row'));
+        const notes = [...card.querySelectorAll('.uc-note')].map(read).filter(Boolean)
+            .map(text => text.replace(/^능력\s*:\s*/, '능력: '));
+        const recipe = [...card.querySelectorAll('.uc-recipe-area .recipe-vertical > *')].map(row => {
+            const unitName = read(row.querySelector('.recipe-badge-name'));
+            if (!unitName) return read(row);
+            const grade = read(row.querySelector('.d-reason-grade'));
+            const tool = read(row.querySelector('.tool-badge'));
+            const conditions = [...row.querySelectorAll('.badge-cond')].map(read).filter(Boolean);
+            if (row.querySelector('.badge-special-cond')) conditions.push('특수조건');
+            const quantity = read(row.querySelector('.badge-qty')).replace(/^·\s*/, '');
+            return [`${grade ? '[' + grade + '] ' : ''}${unitName}${tool ? ' ' + tool : ''}`,
+                ...conditions, quantity].filter(Boolean).join(' · ');
+        });
+        const special = [...card.querySelectorAll('.uc-recipe-area .tsc-item')].map(read).filter(Boolean);
+        // 한 줄 입력란이 줄바꿈을 제거해도 항목 경계를 유지한다.
+        return [`유닛명: ${name}`, ...notes,
+            `조합 조건: ${recipe.length ? recipe.join(' / ') : '정보 없음'}`,
+            ...(special.length ? ['특수 조건: ' + special.join(' / ')] : [])].join(' | ');
+    }
+
+    /* 10-C-3 · 클립보드 호환 처리·임시 요소 정리 */
+    function copyUnitTextFallback(text) {
+        const previousFocus = document.activeElement;
+        const field = document.createElement('textarea');
+        field.value = text;
+        field.readOnly = true;
+        field.tabIndex = -1;
+        field.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;padding:0;border:0;opacity:0;';
+        document.body.appendChild(field);
+        try {
+            field.focus({ preventScroll: true });
+            field.select();
+            field.setSelectionRange(0, text.length);
+            return document.execCommand('copy');
+        } finally {
+            field.remove();
+            previousFocus?.focus?.({ preventScroll: true });
+        }
+    }
+
+    /* 10-C-4 · 복사 실행·성공 및 실패 안내 */
+    async function copyUnitCard(trigger) {
+        const card = trigger.closest('.unit-card');
+        if (!card) return;
+        const text = getUnitCardCopyText(card);
+        const name = card.querySelector('.uc-name-row')?.textContent || '유닛';
+        let copied = false;
+        try {
+            if (navigator.clipboard?.writeText && window.isSecureContext) {
+                try { await navigator.clipboard.writeText(text); copied = true; }
+                catch { copied = copyUnitTextFallback(text); }
+            } else copied = copyUnitTextFallback(text);
+        } catch { copied = false; }
+        showActionFeedback(copied ? `${name} 정보 복사됨 ✓` : '복사하지 못했습니다. 브라우저의 클립보드 권한을 확인해주세요.');
+    }
+
+    /* ── 10-D · 분류·즐겨찾기 카드 페이지 생성 ── */
     function buildPagerPages(htmlItems, pageSize, pageClass) {
         if (!Array.isArray(htmlItems) || htmlItems.length === 0) return '';
         const size = Math.max(1, pageSize || htmlItems.length);
@@ -2356,6 +2359,7 @@
             case 'restoreAllPausedUnits': e.stopPropagation(); restoreAllPausedUnits(); break;
             case 'restoreAllCompletedUnits': e.stopPropagation(); restoreAllCompletedUnits(); break;
             case 'clearCartItems': e.stopPropagation(); clearCartItems(); break;
+            // 카드 정보 복사 전용 분기: 선택·즐겨찾기 동작과 분리한다.
             case 'copyUnitCard': e.preventDefault(); e.stopPropagation(); void copyUnitCard(actionEl); break;
             case 'toggleFavorite': toggleFavorite(uid, e); break;
             case 'smartChange':
