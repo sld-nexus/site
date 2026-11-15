@@ -1,14 +1,10 @@
 window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
-
-
     'use strict';
-    // 공통 화면 갱신 정책은 app.js에서 한 번 정의해 공유한다.
     const { setHTMLIfChanged } = ctx;
 
     const BASIC_HIDDENBOARD_GRADES = new Set(["레어", "에픽", "유니크", "헬", "레전드"]);
 
     const isBasicHiddenboardGrade = (grade) => BASIC_HIDDENBOARD_GRADES.has(grade);
-
 
     /* ── 01 · 카드·페이지 DOM 재사용 ── */
 
@@ -45,8 +41,6 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         if (ctx._isHiddenboardRendered) return;
         const boardEl = ctx.getEl('boardContent');
         if (!boardEl) return;
-        boardEl.classList.remove('invenboard-mode');
-        ctx._isInvenboardRendered = false;
 
         const renderHiddenboardSlot = (id, n, g) => {
             const unit = ctx.unitMap.get(id);
@@ -720,8 +714,6 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
             });
             ctx.completedUnits.clear();
             ctx._selectionResetRetainedCompleted.clear();
-            ctx._invenboardAutoCompletedUnits.clear();
-            ctx._invenboardManualInputs.clear();
             ctx._presetUsed.clear(); ctx.updatePresetBtns();
         } else {
             ctx.resetCompletedMaterialsByLevel(level);
@@ -732,7 +724,7 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
     }
 
     function getGroupRestoreDescription(level) {
-        if (level >= 5) return '완료된 목표를 선택 목록으로 돌리고, 모든 재료의 완료·보유량을 초기화합니다. 보류 목록은 유지합니다.';
+        if (level >= 5) return '완료된 목표를 선택 목록으로 돌리고, 모든 재료의 완료 상태를 초기화합니다. 보류 목록은 유지합니다.';
         if (level >= 4) return '직속·히든·기본 재료의 완료 상태를 함께 복구합니다. 목표와 보류 목록은 유지합니다.';
         if (level >= 3) return '히든·기본 재료의 완료 상태를 함께 복구합니다. 목표와 보류 목록은 유지합니다.';
         return '기본 재료의 완료 상태만 복구합니다. 목표와 보류 목록은 유지합니다.';

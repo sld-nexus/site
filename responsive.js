@@ -1,22 +1,6 @@
 window.NEXUS_RESPONSIVE = function createResponsive(ctx) {
     'use strict';
     let _swipeTimer = null, _isSwiping = false;
-    /* 재료보드 탭: 원본과 동일하게 PC 가로 화면에서만 생성한다. */
-    let invenboardTabNode = null;
-    const isDesktopInvenboardSupported = () => window.matchMedia('(min-width:1025px) and (min-aspect-ratio:11/10) and (hover:hover) and (pointer:fine)').matches
-        && !document.documentElement.classList.contains('nexus-standalone-build');
-
-    function syncInvenboardNav() {
-        if (!isDesktopInvenboardSupported()) {
-            if (ctx._currentViewMode === 'invenboard') ctx.switchLayout('unitboard');
-            invenboardTabNode?.remove();
-            return false;
-        }
-        if (!invenboardTabNode) invenboardTabNode = ctx.getEl('invenboardNavTemplate')?.content.firstElementChild.cloneNode(true);
-        if (invenboardTabNode && !invenboardTabNode.isConnected) ctx.getEl('btnViewHiddenboard')?.after(invenboardTabNode);
-        return true;
-    }
-
     function updatePivotColumns() {
         const { width, height } = window.screen;
         const pixelRatio = window.devicePixelRatio || 1;
@@ -36,7 +20,6 @@ window.NEXUS_RESPONSIVE = function createResponsive(ctx) {
             const key = `${window.innerWidth}:${desktopQuery.matches}:${window.screen.width}:${window.screen.height}:${window.devicePixelRatio}`;
             if (key === viewportKey) return;
             viewportKey = key;
-            syncInvenboardNav();
             updatePivotColumns();
             ctx.hideRecipeTooltip();
             ctx.closeFontSizePopup();
@@ -109,5 +92,5 @@ window.NEXUS_RESPONSIVE = function createResponsive(ctx) {
             }, { passive: true });
         }
     }
-    return { bindSwipeEvents, isDesktopInvenboardSupported, syncInvenboardNav, updatePivotColumns };
+    return { bindSwipeEvents, updatePivotColumns };
 };

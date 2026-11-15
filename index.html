@@ -3,7 +3,7 @@
 <head>
     <script>
         // 앱 표시 및 리소스 캐시 공통 버전
-        window.APP_VERSION = "SLD-NEXUS-V44";
+        window.APP_VERSION = "SLD-NEXUS-V45";
         window.NEXUS_BUILD_VERSION = window.APP_VERSION;
         if (new URLSearchParams(window.location.search).get('nexusStandalone') === 'build') {
             document.documentElement.classList.add('nexus-standalone-build');
@@ -185,7 +185,7 @@
                 }
                 function waitForStyle(){
                     var links=Array.from(document.querySelectorAll('link[data-boot-style]'));
-                    if(links.length!==3) return Promise.reject(new Error('required stylesheet missing'));
+                    if(links.length!==2) return Promise.reject(new Error('required stylesheet missing'));
                     return Promise.all(links.map(function(link){
                         if(link.dataset.loadFailed==='1') return Promise.reject(new Error((link.getAttribute('href') || 'stylesheet') + ' load failed'));
                         if(link.sheet) return Promise.resolve();
@@ -250,11 +250,11 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
-    <meta property="og:image" content="https://sld-nexus.github.io/site/logo.png?v=SLD-NEXUS-V44">
-    <meta property="og:image:secure_url" content="https://sld-nexus.github.io/site/logo.png?v=SLD-NEXUS-V44">
+    <meta property="og:image" content="https://sld-nexus.github.io/site/logo.png?v=SLD-NEXUS-V45">
+    <meta property="og:image:secure_url" content="https://sld-nexus.github.io/site/logo.png?v=SLD-NEXUS-V45">
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:alt" content="개복디 넥서스">
-    <meta name="twitter:image" content="https://sld-nexus.github.io/site/logo.png?v=SLD-NEXUS-V44">
+    <meta name="twitter:image" content="https://sld-nexus.github.io/site/logo.png?v=SLD-NEXUS-V45">
     <meta name="twitter:image:alt" content="개복디 넥서스">
     <meta name="description" content="유닛도감과 히든보드, 나의 조합의 필요 재료와 정수계산을 제공하는 개복디 넥서스">
     <meta property="og:type" content="website">
@@ -279,131 +279,27 @@
             stylesheet.dataset.bootStyle = '1';
             stylesheet.href = window.nexusAssetUrl('./style.css');
             document.head.appendChild(stylesheet);
-            ['hiddenboard.css','invenboard.css'].forEach(function(file){
-                var boardStyle = document.createElement('link');
-                boardStyle.rel = 'stylesheet';
-                boardStyle.dataset.bootStyle = '1';
-                boardStyle.href = window.nexusAssetUrl('./' + file);
-                document.head.appendChild(boardStyle);
-            });
+            var boardStyle = document.createElement('link');
+            boardStyle.rel = 'stylesheet';
+            boardStyle.dataset.bootStyle = '1';
+            boardStyle.href = window.nexusAssetUrl('./hiddenboard.css');
+            document.head.appendChild(boardStyle);
         })();
     </script>
-<script id="headerControlLabels">
+<script id="headerControlLayout">
 (function(){
 'use strict';
-  function syncHeaderControlLayout(){
-    var header=document.getElementById('globalHeader');
-    if(!header) return;
-    var rect=header.getBoundingClientRect();
-    header.dataset.nexusLayout=window.innerWidth<768?'mobile':(rect.width<400 && rect.height>window.innerHeight*.7?'rail':'bar');
-  }
-  function mountControlLabels(){
-    var definitions=[
-      ['[data-nexus-view="dps"]','개복디 빌더',window.innerWidth<768?32:34],
-      ['#btnFontSizePopup','글씨 크기 조절',window.innerWidth<768?32:34],
-      ['#btnBuildStandalone','나의 조합 독립 창',window.innerWidth<768?32:34],
-    ];
-    definitions.forEach(function(definition){
-      document.querySelectorAll(definition[0]).forEach(function(control){
-        if(control.id==='btnBuildStandalone' && new URLSearchParams(window.location.search).get('nexusStandalone')==='build') return;
-        var base=definition[2];
-        control.style.setProperty('--nexus-control-base',base+'px');
-        if(control.classList.contains('nexus-labelled-control')) return;
-        control.classList.add('nexus-labelled-control');
-        control.dataset.nexusControlName=definition[1];
-        control.removeAttribute('title');
-        var icon=document.createElement('span');
-        icon.className='nexus-control-icon';
-        icon.setAttribute('aria-hidden','true');
-        while(control.firstChild) icon.appendChild(control.firstChild);
-        control.appendChild(icon);
-        var label=document.createElement('span');
-        label.className='nexus-action-label';
-        label.setAttribute('aria-hidden','true');
-        var text=document.createElement('span');
-        text.textContent=definition[1];
-        label.appendChild(text);
-        control.appendChild(label);
-      });
-    });
-    if(window.__nexusControlLabelsBound) return;
-    window.__nexusControlLabelsBound=true;
-    var current=null,timer=0,touchTarget=null,armed=null,armedUntil=0;
-    function findControl(target){return target && target.closest ? target.closest('.nexus-labelled-control') : null;}
-    function hide(){
-      clearTimeout(timer);
-      if(current) current.classList.remove('is-label-visible','is-label-touch');
-      current=null;armed=null;armedUntil=0;
+    function syncHeaderControlLayout(){
+        const header = document.getElementById('globalHeader');
+        if (!header) return;
+        const rect = header.getBoundingClientRect();
+        header.dataset.nexusLayout = window.innerWidth < 768 ? 'mobile'
+            : (rect.width < 400 && rect.height > window.innerHeight * .7 ? 'rail' : 'bar');
     }
-    function show(control,touch){
-      if(!control || control.disabled) return;
-      if(current && current!==control) hide();
-      current=control;
-      clearTimeout(timer);
-      control.classList.add('is-label-visible');
-      control.classList.toggle('is-label-touch',!!touch);
-      var label=control.querySelector('.nexus-action-label');
-      var width=Math.ceil(label.scrollWidth);
-      var base=parseFloat(control.style.getPropertyValue('--nexus-control-base')) || 34;
-      control.style.setProperty('--nexus-label-width',width+'px');
-      control.style.setProperty('--nexus-control-expanded',(base+width+12)+'px');
-      timer=setTimeout(hide,touch?3000:2000);
-    }
-    document.addEventListener('pointerover',function(event){
-      if(event.pointerType==='touch' || event.pointerType==='pen') return;
-      var control=findControl(event.target);
-      if(control && control!==findControl(event.relatedTarget)) show(control,false);
-    },true);
-    document.addEventListener('pointerout',function(event){
-      if(event.pointerType==='touch' || event.pointerType==='pen') return;
-      if(current && findControl(event.target)===current && findControl(event.relatedTarget)!==current) hide();
-    },true);
-    document.addEventListener('focusin',function(event){
-      var control=findControl(event.target);
-      if(control && control!==touchTarget) show(control,false);
-    });
-    document.addEventListener('focusout',function(event){
-      if(!touchTarget && current && findControl(event.relatedTarget)!==current) hide();
-    });
-    document.addEventListener('pointerdown',function(event){
-      var control=findControl(event.target);
-      var touch=event.pointerType==='touch' || event.pointerType==='pen';
-      touchTarget=touch?control:null;
-      if(touch && control) show(control,true);
-      else if(!control) hide();
-    },true);
-    document.addEventListener('pointercancel',function(){touchTarget=null;hide();},true);
-    document.addEventListener('click',function(event){
-      var control=findControl(event.target);
-      if(!control) return;
-      // 마우스/키보드는 한 번 클릭, 터치는 이름 확인 후 두 번째 탭에서 실행합니다.
-      if(control!==touchTarget || event.detail===0){touchTarget=null;hide();return;}
-      if(armed===control && Date.now()<armedUntil){touchTarget=null;hide();return;}
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      show(control,true);
-      armed=control;
-      armedUntil=Date.now()+3000;
-    },true);
-    document.addEventListener('keydown',function(event){
-      if(event.key==='Escape'){touchTarget=null;hide();}
-      if(event.key==='Enter' || event.key===' '){touchTarget=null;hide();}
-    },true);
-    var resizeFrame=0,lastLabelWidth=window.innerWidth;
-    window.addEventListener('resize',function(){
-      if(resizeFrame) return;
-      resizeFrame=requestAnimationFrame(function(){
-        resizeFrame=0;
-        if(window.innerWidth===lastLabelWidth) return;
-        lastLabelWidth=window.innerWidth;
-        hide();mountControlLabels();syncHeaderControlLayout();
-      });
-    },{passive:true});
-    window.addEventListener('blur',function(){touchTarget=null;hide();});
-  }
-
-function init(){mountControlLabels();syncHeaderControlLayout();}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', syncHeaderControlLayout, { once:true });
+    } else syncHeaderControlLayout();
+    window.addEventListener('resize', syncHeaderControlLayout, { passive:true });
 })();
 </script>
 </head>
@@ -437,13 +333,12 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
         <nav class="gh-center" aria-label="주요 화면">
             <button type="button" id="btnViewUnitboard" class="gh-nav-btn active" data-action="switchMainView" data-view="unitboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="gh-nav-label">유닛도감</span></button>
             <button type="button" id="btnViewHiddenboard" class="gh-nav-btn" data-action="switchMainView" data-view="hiddenboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v5m-7 5V8h14v5M5 17v4m14-4v4"/><rect x="2" y="13" width="6" height="4" rx="1"/><rect x="16" y="13" width="6" height="4" rx="1"/><rect x="9" y="3" width="6" height="5" rx="1"/></svg><span class="gh-nav-label">히든보드</span></button>
-            <template id="invenboardNavTemplate"><button type="button" id="btnViewInvenboard" class="gh-nav-btn" data-action="switchMainView" data-view="invenboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/></svg><span class="gh-nav-label">재료보드</span></button></template>
         </nav>
         <div class="gh-right">
-            <button type="button" id="btnBuildStandalone" class="gh-tool-btn" data-action="openBuildIndependentWindow" aria-label="조합·재료 독립 창" title="조합·재료 독립 창"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4" width="19" height="15" rx="2"/><rect x="11.5" y="11" width="7.5" height="5.5" rx="1"/></svg></button>
-            <a class="gh-tool-btn" data-nexus-view="dps" href="https://sld-builder.github.io/site/" aria-label="개복디 빌더" title="개복디 빌더"><span aria-hidden="true">B</span></a>
+            <button type="button" id="btnBuildStandalone" class="gh-tool-btn" data-action="openBuildIndependentWindow" aria-label="조합·재료 독립 창" data-nexus-tooltip="조합·재료 독립 창"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4" width="19" height="15" rx="2"/><rect x="11.5" y="11" width="7.5" height="5.5" rx="1"/></svg></button>
+            <a class="gh-tool-btn" data-nexus-view="dps" href="https://sld-builder.github.io/site/" aria-label="개복디 빌더" data-nexus-tooltip="개복디 빌더"><span aria-hidden="true">B</span></a>
             <div class="gh-fontsize-ctrl">
-                <button type="button" class="gh-tool-btn gh-fontsize-trigger" data-action="toggleFontSizePopup" id="btnFontSizePopup" aria-label="글자 크기 조절" aria-controls="fontSizePopup" aria-expanded="false" title="글자 크기 조절">A</button>
+                <button type="button" class="gh-tool-btn gh-fontsize-trigger" data-action="toggleFontSizePopup" id="btnFontSizePopup" aria-label="글자 크기 조절" aria-controls="fontSizePopup" aria-expanded="false" data-nexus-tooltip="글자 크기 조절">A</button>
                 <div id="fontSizePopup" class="gh-fontsize-popup" role="group" aria-label="글자 크기 조절" hidden>
                     <button type="button" class="gh-icon-btn" data-action="decreaseFont" aria-label="글씨 축소">A−</button>
                     <span class="gh-fontsize-val" id="fontSizeLabel" aria-live="polite">100%</span>
@@ -490,7 +385,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     <div id="recipeTooltip" class="recipe-tooltip" role="tooltip" aria-live="polite"></div>
 <script>
         (function(){
-            var files = ['data.js','hiddenboard.js','invenboard.js','responsive.js','app.js'];
+            var files = ['data.js','hiddenboard.js','responsive.js','app.js'];
             function loadNext(index){
                 if(index >= files.length) return;
                 var src = files[index];
