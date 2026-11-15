@@ -95,7 +95,8 @@
     const CLEAN_EXCLUDE_ESSENCE_UNITS = getUserConfigIds(USER_CONFIG["정수계산제외"]);
     // 자동 완료 그룹의 재료 판정은 사용자 수동 설정이 아닌 내부 규칙이다.
     const AUTO_COST_SLOT_RAWS = ['갓오타', '메시브', '자동포탑'];
-    const AUTO_COST_SLOT_SET = new Set(AUTO_COST_SLOT_RAWS.map(clean));
+    const AUTO_COST_SLOT_IDS = AUTO_COST_SLOT_RAWS.map(clean);
+    const AUTO_COST_SLOT_SET = new Set(AUTO_COST_SLOT_IDS);
     const INVENBOARD_INPUT_STEPS = new Map([[clean('자동포탑'), 5]]);
     const AUTO_RECIPE_REQUIREMENT_SET = new Set(['갓오타', '메시브'].map(clean));
     const AUTO_COST_RAW_MAP = Object.fromEntries(AUTO_COST_SLOT_RAWS.map(id => [clean(id), id]));
@@ -146,6 +147,7 @@
             ? { atoms: [VOID_RAY_ATOM] }
             : slot
     );
+    const COSTBOARD_DISPLAY_ATOMS = COSTBOARD_DISPLAY_SLOT_DEFS.flatMap(slot => slot.atoms);
     const INVENBOARD_EXPANSION_SLOT_DEFS = INVENBOARD_EXPANSION_ATOMS.map(atom => ({ atoms: [atom] }));
     const GROUP_DEFS = SYSTEM_CONFIG.groupDefs;
     const titleToGridId = Object.fromEntries(GROUP_DEFS.map(g => [g.title, g.pid]));
@@ -203,12 +205,13 @@
         return color ? ` style="color:${color};"` : '';
     };
 
-    const isOneTime = (u) => u && (CLEAN_ONE_TIME_UNITS.has(u.id) || getGradeIndex(u.grade) >= getGradeIndex(SYSTEM_CONFIG.policy.oneTimeMinGrade || "슈퍼히든"));
+    const ONE_TIME_MIN_GRADE_INDEX = SYSTEM_CONFIG.grades.order.indexOf(SYSTEM_CONFIG.policy.oneTimeMinGrade || "슈퍼히든");
+    const isOneTime = (u) => u && (CLEAN_ONE_TIME_UNITS.has(u.id) || getGradeIndex(u.grade) >= ONE_TIME_MIN_GRADE_INDEX);
     const getUnitNameStyle = (unit) => {
         const color = SYSTEM_CONFIG.grades.colors[unit?.grade];
         return color ? `style="color:${color};"` : '';
     };
-    const calculateTotalCostScore = (u) => u?.parsedCost?.reduce((sum, pc) => sum + (pc.qty || 0), 0) || 0;
+    const calculateTotalCostScore = (u) => u?.totalCostScore || 0;
     const compareUnitForDisplay = (a, b) =>
         (isOneTime(b) ? 1 : 0) - (isOneTime(a) ? 1 : 0) ||
         getGradeIndex(b.grade) - getGradeIndex(a.grade) ||
@@ -233,7 +236,7 @@
     let _actionFeedbackTimer = null;
     const _depVisiting = new Set();
     const GRADE_INDEX_MAP = new Map(SYSTEM_CONFIG.grades.order.map((grade, index) => [grade, index]));
-    const _boardRequirementsCache = new Map(), _costboardTotalsCache = new Map(), _directInvenboardAtomNeedCache = new Map(), _unitEssencePartsCache = new Map();
+    const _boardRequirementsCache = new Map(), _costboardTotalsCache = new Map(), _costboardFlattenCache = new Map(), _directInvenboardAtomNeedCache = new Map(), _unitEssencePartsCache = new Map();
     const _hiddenboardSlotElsByUid = new Map(), _unitCardElsByUid = new Map(), _favoriteBtnElsByUid = new Map(), _dirtyUnitCardIds = new Set();
     let _unitboardDomIndexed = false, _lastUnitboardStateByUid = new Map();
 
@@ -379,7 +382,7 @@
 
     function initializeCacheEngine() {
         depCache.clear();
-        _boardRequirementsCache.clear(); _costboardTotalsCache.clear(); _directInvenboardAtomNeedCache.clear(); _unitEssencePartsCache.clear();
+        _boardRequirementsCache.clear(); _costboardTotalsCache.clear(); _costboardFlattenCache.clear(); _directInvenboardAtomNeedCache.clear(); _unitEssencePartsCache.clear();
         unitMap.forEach(u => {
             u.parsedCost = [];
             if (u.cost && !IGNORE_PARSE_RECIPES.includes(u.cost)) {
@@ -400,6 +403,8 @@
                     if (m) u.parsedRecipe.push({ id: clean(m[1]), qty: m[3] ? parseInt(m[3], 10) : 1, cond: m[2] || '' });
                 });
             }
+            u.totalCostScore = u.parsedCost.reduce((sum, pc) => sum + (pc.qty || 0), 0);
+            u.parsedAutoCosts = u.parsedCost.filter(pc => AUTO_COST_SLOT_SET.has(pc.key));
         });
     }
 
@@ -983,7 +988,7 @@
         if (_boardRequirementsCache.has(cacheKey)) return _boardRequirementsCache.get(cacheKey);
         let reqMap = new Map(), baseMap = new Map(), reasonMap = new Map();
         let autoCostReq = {}, baseAutoCostReq = {}, autoCostReason = {};
-        AUTO_COST_SLOT_RAWS.forEach(k => { autoCostReq[clean(k)] = 0; baseAutoCostReq[clean(k)] = 0; autoCostReason[clean(k)] = new Map(); });
+        AUTO_COST_SLOT_IDS.forEach(id => { autoCostReq[id] = 0; baseAutoCostReq[id] = 0; autoCostReason[id] = new Map(); });
 
         let mergedActive = new Set();
         activeUnits.forEach((_, uid) => unitMap.get(uid)?.parsedRecipe?.forEach(pr => pr.id && activeUnits.has(pr.id) && mergedActive.add(pr.id)));
@@ -1025,12 +1030,12 @@
         baseDeficits.forEach((val, k) => val > 0 && baseMap.set(k, val));
         deficits.forEach((val, k) => val > 0 && reqMap.set(k, Math.max(0, val - (completedUnits.get(k) || 0))));
 
-        const updateAutoCosts = (map, reqObj) => map.forEach((needed, uid) => unitMap.get(uid)?.parsedCost?.forEach(pc => {
-            if (AUTO_COST_SLOT_SET.has(pc.key)) reqObj[pc.key] += pc.qty * needed;
+        const updateAutoCosts = (map, reqObj) => map.forEach((needed, uid) => unitMap.get(uid)?.parsedAutoCosts?.forEach(pc => {
+            reqObj[pc.key] += pc.qty * needed;
         }));
         updateAutoCosts(baseDeficits, baseAutoCostReq);
         updateAutoCosts(deficits, autoCostReq);
-        AUTO_COST_SLOT_RAWS.forEach(k => { const id = clean(k); autoCostReq[id] = Math.max(0, autoCostReq[id] - (completedUnits.get(id) || 0)); });
+        AUTO_COST_SLOT_IDS.forEach(id => { autoCostReq[id] = Math.max(0, autoCostReq[id] - (completedUnits.get(id) || 0)); });
 
         let rootTracking = new Map();
         baseDeficits.forEach((_, uid) => rootTracking.set(uid, new Map()));
@@ -1048,17 +1053,18 @@
                 cRoots.set(`MAT_${uid}`, createMaterialReasonInfo(uid, { cond: child.cond, depth: isDirTarget ? 1 : 2, reqQty: child.qty }));
                 rootTracking.set(child.id, cRoots);
             });
-            uData.parsedCost?.forEach(pc => {
-                if (AUTO_COST_SLOT_SET.has(pc.key) && (deficits.get(uid) || 0) > 0) {
+            uData.parsedAutoCosts?.forEach(pc => {
+                if ((deficits.get(uid) || 0) > 0) {
                     let isDirTarget = activeUnits.has(uid);
                     autoCostReason[pc.key].set(`AUTO_${uid}`, createMaterialReasonInfo(uid, { depth: isDirTarget ? 1 : 2, reqQty: pc.qty }));
                 }
             });
         });
 
+        const targetGroupTitle = GROUP_DEFS.find(g => g.pid === 'grid-target')?.title || '';
         rootTracking.forEach((rMap, cId) => {
             const finalMap = new Map(rMap);
-            if (activeUnits.has(cId)) finalMap.set('TARGET_' + cId, { text: GROUP_DEFS.find(g => g.pid === 'grid-target')?.title || '', cond: '', depth: 0 });
+            if (activeUnits.has(cId)) finalMap.set('TARGET_' + cId, { text: targetGroupTitle, cond: '', depth: 0 });
             reasonMap.set(cId, finalMap);
         });
 
@@ -1157,12 +1163,10 @@
     }
 
     
-    /* 히든보드 전용 구현은 hiddenboard.js */
 
 
 
     
-    /* 히든보드 전용 구현은 hiddenboard.js */
 
 
 
@@ -1223,7 +1227,6 @@
     }
 
     
-    /* 히든보드 전용 구현은 hiddenboard.js */
     let completeUnit;
 
 
@@ -1281,7 +1284,6 @@
     }
 
     
-    /* 히든보드 전용 구현은 hiddenboard.js */
     let resetGroupCompleted;
 
 
@@ -1358,9 +1360,24 @@
             } finally { path.delete(uid); }
         };
 
+        // 동일한 유닛·수량·원자 구성의 최상위 전개 결과만 재사용해 경로별 순환 방지를 유지한다.
+        const flattenPrefix = `${costboardAtoms.join('\x1f')}::${options.preferRecipeAtoms ? 1 : 0}::`;
+        const addFlattenedUnit = (uid, count, destination) => {
+            if (count <= 0) return;
+            const key = `${flattenPrefix}${uid}:${count}`;
+            let flattened = _costboardFlattenCache.get(key);
+            if (!flattened) {
+                const totals = {};
+                flattenUnitToAtoms(uid, count, totals, new Set());
+                flattened = Object.entries(totals);
+                _costboardFlattenCache.set(key, flattened);
+                limitCacheSize(_costboardFlattenCache, 384);
+            }
+            flattened.forEach(([atom, qty]) => { destination[atom] += qty; });
+        };
         if (options.targetMap) costboardAtoms.forEach(atom => targetMap[atom] = Math.max(0, parseInt(options.targetMap[atom], 10) || 0));
-        else activeSource.forEach((count, uid) => count > 0 && flattenUnitToAtoms(uid, count, targetMap, new Set()));
-        (completedSource instanceof Map ? completedSource : new Map(completedSource || [])).forEach((count, uid) => count > 0 && flattenUnitToAtoms(uid, count, completedMap, new Set()));
+        else activeSource.forEach((count, uid) => addFlattenedUnit(uid, count, targetMap));
+        (completedSource instanceof Map ? completedSource : new Map(completedSource || [])).forEach((count, uid) => addFlattenedUnit(uid, count, completedMap));
         costboardAtoms.forEach(atom => remainingMap[atom] = Math.max(0, (targetMap[atom] || 0) - (completedMap[atom] || 0)));
         const result = { targetMap, completedMap, remainingMap };
         _costboardTotalsCache.set(cacheKey, cloneTotals(result)); limitCacheSize(_costboardTotalsCache, 24);
@@ -1371,7 +1388,7 @@
         const { remainingMap } = costboardTotals || calculateCostboardAtomTotals();
         const voidRemaining = Math.max(0, (boardRequirements || calculateBoardRequirements()).reqMap.get(VOID_RAY_ID) || 0);
 
-        COSTBOARD_DISPLAY_SLOT_DEFS.flatMap(slot => slot.atoms).forEach(atom => {
+        COSTBOARD_DISPLAY_ATOMS.forEach(atom => {
             const container = getEl(`vslot-${clean(atom)}`), valueEl = container?.querySelector('.costboard-val'), nameEl = container?.querySelector('.costboard-name');
             if (!container || !valueEl || !nameEl) return;
 
@@ -1399,7 +1416,6 @@
     /* ==========================================================================
        08. 히든 보드
        ========================================================================== */
-    /* 히든보드 전용 구현은 hiddenboard.js */
     let returnHiddenboardControlsToHeader, renderHiddenboard, switchHiddenboardDetail, placeHiddenboardControls, updateHiddenboard;
 
     /* ==========================================================================
@@ -1407,7 +1423,6 @@
        ========================================================================== */
 
 
-    /* 재료보드 전용 구현은 invenboard.js */
     let completeInvenboardTargetsIfReady, updateInvenboard, toggleInvenboardSlotMode, resetInvenboardAmounts, toggleInvenboardInputMode, completeAllInvenboardUnits, getInvenboardAtoms, renderInvenboard, setInvenboardAmount, changeInvenboardAmount, calculateInvenboardCostboardTotals;
 
     function getBoardDependencyDepths(source = activeUnits) {
@@ -1453,7 +1468,6 @@
     }
 
 
-    /* 히든보드 전용 구현은 hiddenboard.js */
     let completeHiddenboardRecipeUnitsIfReady;
 
     /* ==========================================================================
@@ -1461,9 +1475,9 @@
        ========================================================================== */
 
 
-    const getUnitboardMinGradeIndex = () => getGradeIndex(SYSTEM_CONFIG.search.minGradeForSearch || "레전드");
+    const UNITBOARD_MIN_GRADE_INDEX = getGradeIndex(SYSTEM_CONFIG.search.minGradeForSearch || "레전드");
     const isUnitboardVisibleException = (id) => CLEAN_UNITBOARD_VISIBLE_EXCEPTION_IDS.has(clean(id));
-    const isUnitboardVisibleUnit = (u) => !!u && (getGradeIndex(u.grade) >= getUnitboardMinGradeIndex() || isUnitboardVisibleException(u.id));
+    const isUnitboardVisibleUnit = (u) => !!u && (getGradeIndex(u.grade) >= UNITBOARD_MIN_GRADE_INDEX || isUnitboardVisibleException(u.id));
     const isSelectableUnitboardUnit = (u) => isUnitboardVisibleUnit(u) && !isRestrictedUnit(u.id);
     function renderTabs() {
         const t = getEl('unitboardTabs');

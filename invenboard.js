@@ -1,4 +1,3 @@
-/* 기능 모듈 — V39 공통 상태·계산·저장은 app.js 단일 원본을 사용합니다. */
 window.NEXUS_INVEN = function createInvenboard(ctx) {
 
 
@@ -67,10 +66,13 @@ window.NEXUS_INVEN = function createInvenboard(ctx) {
         return walk(uid, 1, '', new Set());
     }
 
+    const voidRayUnitCountCache = new Map();
     function getVoidRayTargetQty(activeSource = ctx.activeUnits) {
         let count = 0;
         activeSource.forEach((qty, uid) => {
-            if (qty > 0) count += countRecipeUnitInTree(uid, ctx.VOID_RAY_ID) * qty;
+            if (qty <= 0) return;
+            if (!voidRayUnitCountCache.has(uid)) voidRayUnitCountCache.set(uid, countRecipeUnitInTree(uid, ctx.VOID_RAY_ID));
+            count += voidRayUnitCountCache.get(uid) * qty;
         });
         return count;
     }

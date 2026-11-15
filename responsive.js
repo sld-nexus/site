@@ -1,4 +1,3 @@
-/* 기능 모듈 — V39 공통 상태·계산·저장은 app.js 단일 원본을 사용합니다. */
 window.NEXUS_RESPONSIVE = function createResponsive(ctx) {
     'use strict';
     let _swipeTimer = null, _isSwiping = false;

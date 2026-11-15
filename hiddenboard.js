@@ -1,4 +1,3 @@
-/* 기능 모듈 — V39 공통 상태·계산·저장은 app.js 단일 원본을 사용합니다. */
 window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
 
 
@@ -182,13 +181,10 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
             return rId.startsWith('TOOL_') ? 1 : (info.reqQty || 1) * parentNeed;
         };
         if (!rMap) return [];
-        const entries = [...rMap.entries()].map(([rId, info], index) => ({
-            rId,
-            info,
-            index,
-            baseQty: getReasonBaseQty(rId, info),
-            displayQty: info?.depth === 0 ? 0 : getReasonBaseQty(rId, info)
-        }));
+        const entries = [...rMap.entries()].map(([rId, info], index) => {
+            const baseQty = getReasonBaseQty(rId, info);
+            return { rId, info, index, baseQty, displayQty: info?.depth === 0 ? 0 : baseQty };
+        });
         let remainingCompleted = Math.max(0, ctx.completedUnits.get(slotId) || 0);
         entries
             .filter(entry => entry.baseQty > 0)
@@ -252,7 +248,7 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
 
         const cEl = slotEl.querySelector(`#d-cond-${id}`);
         if (cEl) {
-            let rMap = reasonMap.get(id);
+            const rMap = reasonMap.get(id);
             const condMap = new Map();
 
             if (rMap) {
@@ -410,7 +406,7 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
 
         const targetHighlight = ctx._currentHighlight || null;
         const highlightDeps = targetHighlight ? ctx.getDependencies(targetHighlight) : null;
-        ctx.getEl('boardContent')?.classList.toggle('highlight-mode', !!targetHighlight);
+        board?.classList.toggle('highlight-mode', !!targetHighlight);
 
         ctx.activeUnits.forEach((_, uid) => ctx.unitMap.get(uid)?.parsedRecipe?.forEach(pr => pr.id && ctx.activeUnits.has(pr.id) && mergedSlots.add(pr.id)));
         const directMaterials = new Set();
@@ -443,20 +439,20 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         };
 
         const visibleMaterialIds = new Set([...baseMap.keys(), ...reqMap.keys()]);
+        const hiddenGroupMinGradeIndex = ctx.getGradeIndex(ctx.SYSTEM_CONFIG.policy.hiddenGroupMinGrade || '히든');
 
         const processSlot = (id) => {
             const slotEl = ctx._hiddenboardSlotElsByUid.get(id); if (!slotEl) return null;
             
-            const isAutoCost = ctx.AUTO_COST_SLOT_SET.has(id);
-            if (isAutoCost) return null;
-            
+            if (ctx.AUTO_COST_SLOT_SET.has(id)) return null;
+
             const isTarget = ctx.activeUnits.has(id);
-            const isCompletedTarget = !isTarget && !isAutoCost && ctx.completedTargets.has(id);
-            const isMergedSlot = isTarget && !isAutoCost && mergedSlots.has(id);
+            const isCompletedTarget = !isTarget && ctx.completedTargets.has(id);
+            const isMergedSlot = isTarget && mergedSlots.has(id);
             
             let needed = reqMap.get(id) || 0;
             if (isMergedSlot) needed = Math.max(0, (baseMap.get(id)||0) - (ctx.completedUnits.get(id)||0));
-            else if (isTarget && !isAutoCost) needed = Math.max(0, (ctx.activeUnits.get(id)||1) - (ctx.completedUnits.get(id)||0));
+            else if (isTarget) needed = Math.max(0, (ctx.activeUnits.get(id)||1) - (ctx.completedUnits.get(id)||0));
             if (isCompletedTarget) needed = 0;
             
             const baseNeeded = isTarget ? (isMergedSlot ? (baseMap.get(id)||0) : (ctx.activeUnits.get(id)||1)) :
@@ -474,10 +470,8 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
             slotEl.classList.toggle('has-target', !isCompleted);
             slotEl.classList.toggle('is-completed', isCompleted);
 
-            let tGrid = null;
-
             const uGrade = ctx.unitMap.get(id)?.grade;
-            const isHiddenGroup = ctx.getGradeIndex(uGrade) >= ctx.getGradeIndex(ctx.SYSTEM_CONFIG.policy.hiddenGroupMinGrade || "히든");
+            const isHiddenGroup = ctx.getGradeIndex(uGrade) >= hiddenGroupMinGradeIndex;
             const depthInTree = exactDepths.has(id) ? exactDepths.get(id) : 99;
             
             const nativeLevel = isHiddenGroup ? (depthInTree <= 2 ? 3 : 2) : 1;
@@ -501,7 +495,7 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
             let nativeGrid = null;
             if (isHiddenGroup) nativeGrid = grids.upperHidden;
             else if (isBasicHiddenboardGrade(uGrade)) nativeGrid = grids.basicHidden;
-            tGrid = upgradedGrid || nativeGrid;
+            const tGrid = upgradedGrid || nativeGrid;
             if (!tGrid) return null;
 
             const isFinalGoal = tGrid === grids.target;
@@ -655,6 +649,8 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         ctx._completeLock.add(uid);
         const cWrapEl = document.getElementById(`craft-wrap-${uid}`);
         const lockBtns = cWrapEl ? Array.from(cWrapEl.querySelectorAll('button')) : [];
+        const enabledBtns = lockBtns.filter(b => !b.disabled);
+        const restoreBtns = () => enabledBtns.forEach(b => { if (b.isConnected) b.disabled = false; });
         lockBtns.forEach(b => b.disabled = true);
         try {
             const { reqMap, baseMap, autoCostReq } = ctx.calculateBoardRequirements();
@@ -701,12 +697,15 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
                 completeHiddenboardRecipeUnitsIfReady();
                 ctx.commitNexusStateChange({ clearHighlight: true });
             } else {
-                lockBtns.forEach(b => b.disabled = false);
+                restoreBtns();
             }
         } catch {
-            lockBtns.forEach(b => b.disabled = false);
+            restoreBtns();
         } finally {
-            setTimeout(() => { ctx._completeLock.delete(uid); }, ctx.APP_INTERNAL.completeLockDelay);
+            setTimeout(() => {
+                ctx._completeLock.delete(uid);
+                restoreBtns();
+            }, ctx.APP_INTERNAL.completeLockDelay);
         }
     }
 
