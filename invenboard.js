@@ -1,19 +1,53 @@
 /* 기능 모듈 — V39 공통 상태·계산·저장은 app.js 단일 원본을 사용합니다. */
 window.NEXUS_INVEN = function createInvenboard(ctx) {
-    'use strict';
-    const setHTMLIfChanged = (element, html) => {
-        if (element._lastHTML === html) return;
-        element.innerHTML = html;
-        element._lastHTML = html;
-    };
 
-    /* 재료보드 입력·보유량·완료 처리 */
+
+    'use strict';
+    // 공통 화면 갱신 정책은 app.js에서 한 번 정의해 공유한다.
+    const { setHTMLIfChanged } = ctx;
+
+
+    /* ── 01 · 슬롯 정의·입력 수량 ── */
 
     function getInvenboardAtoms() {
         return ctx._isInvenboardSlotsExpanded ? ctx.INVENBOARD_ALL_ATOMS : ctx.INVENBOARD_CORE_ATOMS;
     }
 
-    // 재료보드 전용 레시피 경로 집계: 유닛족보 UI와 독립적으로 계산한다.
+    function getInvenboardSlotDefs() {
+        if (!ctx._isInvenboardSlotsExpanded) return ctx.COSTBOARD_DISPLAY_SLOT_DEFS;
+        const bottomSlotIds = new Set(["땅거미지뢰", "자동포탑", "우르사돈암", "우르사돈수", ctx.VOID_RAY_ATOM].map(ctx.clean));
+        const isBottomSlot = (slot) => (slot.atoms || []).some(atom => bottomSlotIds.has(ctx.clean(atom)));
+        const upperSlots = ctx.COSTBOARD_DISPLAY_SLOT_DEFS.filter(slot => !isBottomSlot(slot));
+        const bottomSlots = ctx.COSTBOARD_DISPLAY_SLOT_DEFS.filter(isBottomSlot);
+        return [...upperSlots, ...ctx.INVENBOARD_EXPANSION_SLOT_DEFS, ...bottomSlots];
+    }
+
+    function getInvenboardSlotIdSet() {
+        return ctx._isInvenboardSlotsExpanded ? ctx.ALL_INVENBOARD_SLOT_SET : ctx.INVENBOARD_SLOT_SET;
+    }
+
+    function getInvenboardInputStep(id) {
+        const cleanId = ctx.normalizeSavedId(id);
+        return ctx.INVENBOARD_INPUT_STEPS.get(cleanId) || 1;
+    }
+
+    function normalizeInvenboardAmount(qty, maxQty) {
+        const parsed = parseInt(qty, 10);
+        if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+        const limit = Math.max(0, parseInt(maxQty, 10) || 0);
+        if (limit <= 0) return 0;
+        return Math.min(parsed, limit);
+    }
+
+    function getInvenboardMaxQty(id, totals = calculateInvenboardCostboardTotals()) {
+        if (!getInvenboardSlotIdSet().has(id)) return 0;
+        if (id === ctx.VOID_RAY_ID) return Math.max(0, totals.targetMap[ctx.VOID_RAY_ATOM] || 0);
+        return Math.max(0, totals.targetMap[ctx.getCostboardAtomRawName(id)] || 0);
+    }
+
+
+    /* ── 02 · 필요량·보유량 계산 ── */
+
     function countRecipeUnitInTree(uid, soughtId) {
         function walk(id, amount, parentId, ancestors) {
             if (!id) return 0;
@@ -52,32 +86,6 @@ window.NEXUS_INVEN = function createInvenboard(ctx) {
         return targetMap;
     }
 
-    function getInvenboardSlotDefs() {
-        if (!ctx._isInvenboardSlotsExpanded) return ctx.COSTBOARD_DISPLAY_SLOT_DEFS;
-        const bottomSlotIds = new Set(["땅거미지뢰", "자동포탑", "우르사돈암", "우르사돈수", ctx.VOID_RAY_ATOM].map(ctx.clean));
-        const isBottomSlot = (slot) => (slot.atoms || []).some(atom => bottomSlotIds.has(ctx.clean(atom)));
-        const upperSlots = ctx.COSTBOARD_DISPLAY_SLOT_DEFS.filter(slot => !isBottomSlot(slot));
-        const bottomSlots = ctx.COSTBOARD_DISPLAY_SLOT_DEFS.filter(isBottomSlot);
-        return [...upperSlots, ...ctx.INVENBOARD_EXPANSION_SLOT_DEFS, ...bottomSlots];
-    }
-
-    function getInvenboardSlotIdSet() {
-        return ctx._isInvenboardSlotsExpanded ? ctx.ALL_INVENBOARD_SLOT_SET : ctx.INVENBOARD_SLOT_SET;
-    }
-
-    function getInvenboardInputStep(id) {
-        const cleanId = ctx.normalizeSavedId(id);
-        return ctx.INVENBOARD_INPUT_STEPS.get(cleanId) || 1;
-    }
-
-    function normalizeInvenboardAmount(qty, maxQty) {
-        const parsed = parseInt(qty, 10);
-        if (!Number.isFinite(parsed) || parsed <= 0) return 0;
-        const limit = Math.max(0, parseInt(maxQty, 10) || 0);
-        if (limit <= 0) return 0;
-        return Math.min(parsed, limit);
-    }
-
     function getEffectiveInvenboardCompletedSource(completedSource = ctx.completedUnits, activeSource = ctx.getInvenboardTrackedTargets(), targetMap = null) {
         const effective = new Map(completedSource instanceof Map ? completedSource : new Map(completedSource || []));
         const targetSource = activeSource instanceof Map ? activeSource : ctx.getInvenboardTrackedTargets();
@@ -109,23 +117,52 @@ window.NEXUS_INVEN = function createInvenboard(ctx) {
         return totals;
     }
 
-    function updateInvenboardSlotModeButton() {
-        const btn = ctx.getEl('invenboardSlotModeBtn');
-        if (!btn) return;
-        setHTMLIfChanged(btn, `<span>${ctx._isInvenboardSlotsExpanded ? '핵심재료 전환' : '전체재료 전환'}</span><span class="board-action-icon" aria-hidden="true">▦</span>`);
-        btn.setAttribute('aria-pressed', String(ctx._isInvenboardSlotsExpanded));
-        btn.title = ctx._isInvenboardSlotsExpanded ? '현재 전체 재료 표시 · 핵심재료로 전환' : '현재 핵심재료 표시 · 전체재료로 전환';
-        btn.classList.toggle('is-expanded', ctx._isInvenboardSlotsExpanded);
+    function getDirectInvenboardAtomNeed(uid, qty = 1) {
+        const amount = Math.max(1, parseInt(qty, 10) || 1);
+        const cacheKey = `${ctx._isInvenboardSlotsExpanded ? 'expanded' : 'core'}:${uid}:${amount}`;
+        if (ctx._directInvenboardAtomNeedCache.has(cacheKey)) return new Map(ctx._directInvenboardAtomNeedCache.get(cacheKey));
+        const { targetMap } = calculateInvenboardCostboardTotals(new Map(), { activeSource: new Map([[uid, amount]]), rawCompleted: true });
+        const need = new Map(getInvenboardAtoms().map(atom => [ctx.clean(atom), Math.max(0, targetMap[atom] || 0)]).filter(([, n]) => n > 0));
+        ctx._directInvenboardAtomNeedCache.set(cacheKey, need); ctx.limitCacheSize(ctx._directInvenboardAtomNeedCache, 512);
+        return new Map(need);
     }
 
-    function toggleInvenboardSlotMode() {
-        if (ctx._currentViewMode !== 'invenboard') return;
-        ctx._isInvenboardSlotsExpanded = !ctx._isInvenboardSlotsExpanded;
-        ctx._isInvenboardRendered = false;
-        const boardEl = ctx.getEl('boardContent');
-        if (boardEl) boardEl.innerHTML = '';
-        ctx.commitNexusStateChange();
+    function getInvenboardOwnedAtomMap({ directOnly = false } = {}) {
+        const available = new Map();
+        if (!directOnly) {
+            const totals = calculateInvenboardCostboardTotals();
+            getInvenboardAtoms().forEach(atom => {
+                const qty = Math.max(0, parseInt(totals.completedMap[atom], 10) || 0);
+                if (qty > 0) available.set(ctx.clean(atom), qty);
+            });
+            return available;
+        }
+
+        const effectiveCompleted = getEffectiveInvenboardCompletedSource(ctx.completedUnits);
+        getInvenboardAtoms().forEach(atom => {
+            const id = ctx.clean(atom);
+            const qty = Math.max(0, parseInt(effectiveCompleted.get(id), 10) || 0);
+            if (qty > 0) available.set(id, qty);
+        });
+        return available;
     }
+
+    function getCompletedRecipeProgress(uid, qty) {
+        const unit = ctx.unitMap.get(uid);
+        if (!unit?.parsedRecipe?.length) return { hasRecipe: false, hasAnyCompleted: false, hasEnoughCompleted: false };
+        let hasAnyCompleted = false;
+        const hasEnoughCompleted = unit.parsedRecipe.every(child => {
+            if (!child.id || ctx.isAutoRecipeRequirementSatisfied(child.id)) return true;
+            const needQty = (ctx.isToolRequirement(uid, child.id) ? 1 : child.qty) * qty;
+            const completedQty = Math.max(0, parseInt(ctx.completedUnits.get(child.id), 10) || 0);
+            if (completedQty > 0) hasAnyCompleted = true;
+            return completedQty >= needQty;
+        });
+        return { hasRecipe: true, hasAnyCompleted, hasEnoughCompleted };
+    }
+
+
+    /* ── 03 · 보드·작업 버튼 생성 ── */
 
     function ensureInvenboardHeaderActions() {
         const mobileHost = ctx.getEl('invenboardActionsHost');
@@ -200,55 +237,17 @@ window.NEXUS_INVEN = function createInvenboard(ctx) {
         ctx._isInvenboardRendered = true;
     }
 
-    function getInvenboardMaxQty(id, totals = calculateInvenboardCostboardTotals()) {
-        if (!getInvenboardSlotIdSet().has(id)) return 0;
-        if (id === ctx.VOID_RAY_ID) return Math.max(0, totals.targetMap[ctx.VOID_RAY_ATOM] || 0);
-        return Math.max(0, totals.targetMap[ctx.getCostboardAtomRawName(id)] || 0);
+    function updateInvenboardSlotModeButton() {
+        const btn = ctx.getEl('invenboardSlotModeBtn');
+        if (!btn) return;
+        setHTMLIfChanged(btn, `<span>${ctx._isInvenboardSlotsExpanded ? '핵심재료 전환' : '전체재료 전환'}</span><span class="board-action-icon" aria-hidden="true">▦</span>`);
+        btn.setAttribute('aria-pressed', String(ctx._isInvenboardSlotsExpanded));
+        btn.title = ctx._isInvenboardSlotsExpanded ? '현재 전체 재료 표시 · 핵심재료로 전환' : '현재 핵심재료 표시 · 전체재료로 전환';
+        btn.classList.toggle('is-expanded', ctx._isInvenboardSlotsExpanded);
     }
 
-    function getDirectInvenboardAtomNeed(uid, qty = 1) {
-        const amount = Math.max(1, parseInt(qty, 10) || 1);
-        const cacheKey = `${ctx._isInvenboardSlotsExpanded ? 'expanded' : 'core'}:${uid}:${amount}`;
-        if (ctx._directInvenboardAtomNeedCache.has(cacheKey)) return new Map(ctx._directInvenboardAtomNeedCache.get(cacheKey));
-        const { targetMap } = calculateInvenboardCostboardTotals(new Map(), { activeSource: new Map([[uid, amount]]), rawCompleted: true });
-        const need = new Map(getInvenboardAtoms().map(atom => [ctx.clean(atom), Math.max(0, targetMap[atom] || 0)]).filter(([, n]) => n > 0));
-        ctx._directInvenboardAtomNeedCache.set(cacheKey, need); ctx.limitCacheSize(ctx._directInvenboardAtomNeedCache, 512);
-        return new Map(need);
-    }
 
-    function getInvenboardOwnedAtomMap({ directOnly = false } = {}) {
-        const available = new Map();
-        if (!directOnly) {
-            const totals = calculateInvenboardCostboardTotals();
-            getInvenboardAtoms().forEach(atom => {
-                const qty = Math.max(0, parseInt(totals.completedMap[atom], 10) || 0);
-                if (qty > 0) available.set(ctx.clean(atom), qty);
-            });
-            return available;
-        }
-
-        const effectiveCompleted = getEffectiveInvenboardCompletedSource(ctx.completedUnits);
-        getInvenboardAtoms().forEach(atom => {
-            const id = ctx.clean(atom);
-            const qty = Math.max(0, parseInt(effectiveCompleted.get(id), 10) || 0);
-            if (qty > 0) available.set(id, qty);
-        });
-        return available;
-    }
-
-    function getCompletedRecipeProgress(uid, qty) {
-        const unit = ctx.unitMap.get(uid);
-        if (!unit?.parsedRecipe?.length) return { hasRecipe: false, hasAnyCompleted: false, hasEnoughCompleted: false };
-        let hasAnyCompleted = false;
-        const hasEnoughCompleted = unit.parsedRecipe.every(child => {
-            if (!child.id || ctx.isAutoRecipeRequirementSatisfied(child.id)) return true;
-            const needQty = (ctx.isToolRequirement(uid, child.id) ? 1 : child.qty) * qty;
-            const completedQty = Math.max(0, parseInt(ctx.completedUnits.get(child.id), 10) || 0);
-            if (completedQty > 0) hasAnyCompleted = true;
-            return completedQty >= needQty;
-        });
-        return { hasRecipe: true, hasAnyCompleted, hasEnoughCompleted };
-    }
+    /* ── 04 · 재료·목표 완료 처리 ── */
 
     function getInvenboardMaterialCompletionCandidates(baseMap) {
         const depths = ctx.getBoardDependencyDepths();
@@ -374,6 +373,9 @@ window.NEXUS_INVEN = function createInvenboard(ctx) {
         return true;
     }
 
+
+    /* ── 05 · 수량 입력·모드·초기화 ── */
+
     function setInvenboardAmount(id, qty, options = {}) {
         const cleanId = ctx.normalizeSavedId(id);
         if (!getInvenboardSlotIdSet().has(cleanId)) return;
@@ -394,6 +396,15 @@ window.NEXUS_INVEN = function createInvenboard(ctx) {
         if (!getInvenboardSlotIdSet().has(cleanId)) return;
         const currentQty = ctx.completedUnits.get(cleanId) || 0;
         setInvenboardAmount(cleanId, currentQty + (parseInt(delta, 10) || 0));
+    }
+
+    function toggleInvenboardSlotMode() {
+        if (ctx._currentViewMode !== 'invenboard') return;
+        ctx._isInvenboardSlotsExpanded = !ctx._isInvenboardSlotsExpanded;
+        ctx._isInvenboardRendered = false;
+        const boardEl = ctx.getEl('boardContent');
+        if (boardEl) boardEl.innerHTML = '';
+        ctx.commitNexusStateChange();
     }
 
     function toggleInvenboardInputMode() {
@@ -449,6 +460,9 @@ window.NEXUS_INVEN = function createInvenboard(ctx) {
         });
         ctx.commitNexusStateChange({ clearHighlight: true });
     }
+
+
+    /* ── 06 · 보드 갱신 ── */
 
     function updateInvenboard(costboardTotals = null) {
         if (!ctx._isInvenboardRendered) return;
@@ -526,5 +540,10 @@ window.NEXUS_INVEN = function createInvenboard(ctx) {
             if (isEmpty) setHTMLIfChanged(empty, `<div class="empty-msg-enhanced"><div class="empty-main">유닛도감에서 유닛을 선택하세요</div></div>`);
         }
     }
+
+
+    /* ── 공개 API ── */
+
     return { calculateInvenboardCostboardTotals, changeInvenboardAmount, completeAllInvenboardUnits, completeInvenboardTargetsIfReady, getInvenboardAtoms, renderInvenboard, resetInvenboardAmounts, setInvenboardAmount, toggleInvenboardInputMode, toggleInvenboardSlotMode, updateInvenboard };
+
 };

@@ -371,7 +371,8 @@ html.nexus-standalone-build,html.nexus-standalone-build body { height:auto; min-
 }
 @media (hover:none) and (pointer:coarse) and (min-width:768px) and (max-width:1366px) and (min-height:600px) {
     .unitboard-category-grid,.unitboard-fav-grid { display:grid; grid-template-columns:none; grid-auto-flow:column; grid-auto-columns:100%; gap:12px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; scroll-padding-inline:8px; padding:7px 8px 14px; }
-    .unitboard-page { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:repeat(3,auto); gap:7px; min-width:0; scroll-snap-align:start; align-items:stretch; }
+    /* 마지막 페이지도 카드 내용 높이만 사용하며 빈 행은 늘리지 않는다. */
+    .unitboard-page { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:repeat(3,max-content); gap:7px; min-width:0; scroll-snap-align:start; align-items:stretch; align-content:start; }
     .unitboard-fav-page { grid-template-rows:repeat(1,auto); }
 }
 /* 모바일은 가로 1장 · 세로 2장씩 넘기는 카드 구성 */

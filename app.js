@@ -1,10 +1,4 @@
 (() => {
-    const setHTMLIfChanged = (element, html) => {
-        if (element._lastHTML === html) return;
-        element.innerHTML = html;
-        element._lastHTML = html;
-    };
-
 
     /* ==========================================================================
        01. 공통 설정 및 정책
@@ -185,6 +179,11 @@
 
     /* DOM·등급·검색 공통 유틸 */
     const getEl = (id) => document.getElementById(id);
+    const setHTMLIfChanged = (element, html) => {
+        if (element._lastHTML === html) return;
+        element.innerHTML = html;
+        element._lastHTML = html;
+    };
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>"]/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[ch]));
 
     const triggerHaptic = () => navigator.vibrate?.(APP_INTERNAL.hapticDuration);
@@ -1964,7 +1963,7 @@
         const versionText = getEl('ghTitleVersion');
         if (!versionText) return;
         const buildVersion = String(window.APP_VERSION || window.NEXUS_BUILD_VERSION || '');
-        const shortVersion = buildVersion.match(/N-VAERON-(.+)$/i)?.[1] || '';
+        const shortVersion = buildVersion.match(/SLD-NEXUS-(.+)$/i)?.[1] || '';
         versionText.textContent = shortVersion ? ` · ${shortVersion}` : '';
     };
     function updateBoardHeader() {
@@ -2376,6 +2375,7 @@
        ========================================================================== */
     /* 기능별 모듈 연결: 공통 상태를 복제하지 않고 기존 app.js 스코프를 공유 */
     const boardModuleContext = {
+        setHTMLIfChanged,
         get ALL_INVENBOARD_SLOT_SET() { return ALL_INVENBOARD_SLOT_SET; },
         get APP_INTERNAL() { return APP_INTERNAL; },
         get AUTO_COST_SLOT_SET() { return AUTO_COST_SLOT_SET; },

@@ -1,116 +1,46 @@
 /* 기능 모듈 — V39 공통 상태·계산·저장은 app.js 단일 원본을 사용합니다. */
 window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
+
+
     'use strict';
-    const setHTMLIfChanged = (element, html) => {
-        if (element._lastHTML === html) return;
-        element.innerHTML = html;
-        element._lastHTML = html;
-    };
+    // 공통 화면 갱신 정책은 app.js에서 한 번 정의해 공유한다.
+    const { setHTMLIfChanged } = ctx;
 
-    function getGroupRestoreDescription(level) {
-        if (level >= 5) return '완료된 목표를 선택 목록으로 돌리고, 모든 재료의 완료·보유량을 초기화합니다. 보류 목록은 유지합니다.';
-        if (level >= 4) return '직속·히든·기본 재료의 완료 상태를 함께 복구합니다. 목표와 보류 목록은 유지합니다.';
-        if (level >= 3) return '히든·기본 재료의 완료 상태를 함께 복구합니다. 목표와 보류 목록은 유지합니다.';
-        return '기본 재료의 완료 상태만 복구합니다. 목표와 보류 목록은 유지합니다.';
-    }
-
-    function updateGroupRestoreButtons() {
-        document.querySelectorAll('.grp-title-actions [data-action="resetGroup"]').forEach(btn => {
-            const level = parseInt(btn.dataset.level, 10), count = ctx.getGroupRestoreIds(level).size;
-            const description = getGroupRestoreDescription(level);
-            btn.disabled = count === 0;
-            btn.title = `${description} · ${count > 0 ? `복구 대상 ${count}종` : '복구할 항목 없음'}`;
-        });
-    }
-
-    function completeUnit(uid, amount) {
-        if (ctx._completeLock.has(uid)) return;
-        ctx._completeLock.add(uid);
-        const cWrapEl = document.getElementById(`craft-wrap-${uid}`);
-        const lockBtns = cWrapEl ? Array.from(cWrapEl.querySelectorAll('button')) : [];
-        lockBtns.forEach(b => b.disabled = true);
-        try {
-            const { reqMap, baseMap, autoCostReq } = ctx.calculateBoardRequirements();
-            const isTarget = ctx.activeUnits.has(uid);
-            const isAutoCost = ctx.AUTO_COST_SLOT_SET.has(uid);
-            let isMergedSlot = false;
-            if (isTarget && !isAutoCost) {
-                ctx.activeUnits.forEach((_, activeId) => {
-                    if (activeId !== uid && ctx.unitMap.get(activeId)?.parsedRecipe?.some(pr => pr.id === uid)) isMergedSlot = true;
-                });
-            }
-            const isPureTarget = isTarget && !isMergedSlot && !isAutoCost;
-            let reqVal = 0;
-            if (isPureTarget) reqVal = Math.max(0, (ctx.activeUnits.get(uid) || 1) - (ctx.completedUnits.get(uid) || 0));
-            else if (isAutoCost) reqVal = autoCostReq[uid] || 0;
-            else if (isTarget && isMergedSlot) reqVal = Math.max(0, (baseMap.get(uid) || 1) - (ctx.completedUnits.get(uid) || 0));
-            else reqVal = reqMap.get(uid) || 0;
-
-            const requestedQty = amount !== undefined ? parseInt(amount, 10) : reqVal;
-            const processQty = requestedQty === 10 && reqVal < 10 ? 0 : Math.min(requestedQty, reqVal);
-            if (processQty > 0) {
-                const prevCompleted = ctx.completedUnits.get(uid) || 0;
-                ctx.deleteCompletedRecipe(uid, processQty);
-                const newComp = Math.max(prevCompleted, ctx.completedUnits.get(uid) || 0) + processQty;
-                ctx.completedUnits.set(uid, newComp);
-
-                if (isPureTarget) {
-                    if (newComp >= (ctx.activeUnits.get(uid) || 1)) {
-                        ctx.completedTargets.set(uid, ctx.activeUnits.get(uid) || 1);
-                        ctx.activeUnits.delete(uid);
-                        ctx.completedUnits.delete(uid);
-                    }
-                } else if (isTarget && isMergedSlot) {
-                    const totalQty = baseMap.get(uid) || 1;
-                    if (newComp >= totalQty) {
-                        const activeQty = ctx.activeUnits.get(uid) || 1;
-                        const matQty = totalQty - activeQty;
-                        ctx.completedTargets.set(uid, activeQty);
-                        ctx.activeUnits.delete(uid);
-                        if (matQty > 0) ctx.completedUnits.set(uid, matQty);
-                        else ctx.completedUnits.delete(uid);
-                    }
-                }
-                completeHiddenboardRecipeUnitsIfReady();
-                ctx.commitNexusStateChange({ clearHighlight: true });
-            } else {
-                lockBtns.forEach(b => b.disabled = false);
-            }
-        } catch {
-            lockBtns.forEach(b => b.disabled = false);
-        } finally {
-            setTimeout(() => { ctx._completeLock.delete(uid); }, ctx.APP_INTERNAL.completeLockDelay);
-        }
-    }
-
-    function resetGroupCompleted(level) {
-        const ids = ctx.getGroupRestoreIds(level);
-        if (ids.size === 0) return;
-        if (level >= 5) {
-            const targetEntries = Array.from(ctx.completedTargets.entries());
-            ctx.completedTargets.clear();
-            targetEntries.forEach(([uid, qty]) => {
-                ctx.setActiveUnitQty(uid, (ctx.activeUnits.get(uid) || 0) + qty);
-            });
-            ctx.completedUnits.clear();
-            ctx._selectionResetRetainedCompleted.clear();
-            ctx._invenboardAutoCompletedUnits.clear();
-            ctx._invenboardManualInputs.clear();
-            ctx._presetUsed.clear(); ctx.updatePresetBtns();
-        } else {
-            ctx.resetCompletedMaterialsByLevel(level);
-        }
-        const label = ctx.GROUP_DEFS.find(group => group.resetLevel === level)?.resetLabel || '완료 복구';
-        ctx.showActionFeedback(`${label} · ${ids.size}종 복구됨 ✓`);
-        ctx.commitNexusStateChange({ clearHighlight: true });
-    }
-
-
-
-
-    /* 히든보드 */
     const BASIC_HIDDENBOARD_GRADES = new Set(["레어", "에픽", "유니크", "헬", "레전드"]);
+
     const isBasicHiddenboardGrade = (grade) => BASIC_HIDDENBOARD_GRADES.has(grade);
+
+
+    /* ── 01 · 카드·페이지 DOM 재사용 ── */
+
+    function reconcileChildren(parent, children) {
+        let cursor = parent.firstElementChild;
+        for (const child of children) {
+            if (child === cursor) cursor = cursor.nextElementSibling;
+            else parent.insertBefore(child, cursor);
+        }
+        while (cursor) { const next = cursor.nextElementSibling; cursor.remove(); cursor = next; }
+    }
+
+    function updateGridPages(grid, items, onlyVisible) {
+        const key = items.map(el => `${el.id}:${onlyVisible && el.style.display === 'none' ? 0 : 1}`).join('|');
+        if (grid._pageKey === key) return;
+        const shown = onlyVisible ? items.filter(el => el.style.display !== 'none') : items;
+        const hidden = onlyVisible ? items.filter(el => el.style.display === 'none') : [];
+        const pages = Array.from(grid.children).filter(el => el.classList.contains('hiddenboard-page'));
+        const nextPages = [];
+        for (let i = 0; i < shown.length; i += 6) {
+            const page = pages[i / 6] || document.createElement('div');
+            page.className = 'hiddenboard-page';
+            reconcileChildren(page, shown.slice(i, i + 6));
+            nextPages.push(page);
+        }
+        reconcileChildren(grid, [...hidden, ...nextPages]);
+        grid._pageKey = key;
+    }
+
+
+    /* ── 02 · 보드 생성·작업 버튼 배치 ── */
 
     function renderHiddenboard() {
         if (ctx._isHiddenboardRendered) return;
@@ -154,6 +84,34 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         placeHiddenboardControls();
     }
 
+    function returnHiddenboardControlsToHeader() {
+        const actions = ctx.getEl('hiddenboardGlobalActions') || document.querySelector('.hiddenboard-ph-btns');
+        const mobileHost = ctx.getEl('boardMobileHeader');
+        if (!actions || !mobileHost) return;
+        if (actions.parentElement !== mobileHost) mobileHost.appendChild(actions);
+        actions.classList.remove('hiddenboard-actions-in-group');
+        actions.classList.add('hiddenboard-actions-in-header');
+    }
+
+    function placeHiddenboardControls() {
+        const actions = ctx.getEl('hiddenboardGlobalActions') || document.querySelector('.hiddenboard-ph-btns');
+        const mobileHost = ctx.getEl('boardMobileHeader');
+        const desktopHost = ctx.getEl('group-target-actions');
+        if (!actions || !mobileHost) return;
+        const useMobileHeader = window.matchMedia('(max-width: 767px)').matches || !desktopHost;
+        if (useMobileHeader) {
+            if (actions.parentElement !== mobileHost) mobileHost.appendChild(actions);
+            actions.classList.remove('hiddenboard-actions-in-group');
+            actions.classList.add('hiddenboard-actions-in-header');
+        } else {
+            if (actions.parentElement !== desktopHost) desktopHost.insertBefore(actions, desktopHost.firstChild);
+            actions.classList.remove('hiddenboard-actions-in-header');
+            actions.classList.add('hiddenboard-actions-in-group');
+        }
+    }
+
+
+    /* ── 03 · 조합법·상위조합·조건 표시 ── */
 
     function getHiddenboardRecipeQuantity(id, calcResult) {
         const unit = ctx.unitMap.get(id);
@@ -212,60 +170,6 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         renderHiddenboardRecipe(slotEl, calcResult);
     }
 
-    function returnHiddenboardControlsToHeader() {
-        const actions = ctx.getEl('hiddenboardGlobalActions') || document.querySelector('.hiddenboard-ph-btns');
-        const mobileHost = ctx.getEl('boardMobileHeader');
-        if (!actions || !mobileHost) return;
-        if (actions.parentElement !== mobileHost) mobileHost.appendChild(actions);
-        actions.classList.remove('hiddenboard-actions-in-group');
-        actions.classList.add('hiddenboard-actions-in-header');
-    }
-
-    function placeHiddenboardControls() {
-        const actions = ctx.getEl('hiddenboardGlobalActions') || document.querySelector('.hiddenboard-ph-btns');
-        const mobileHost = ctx.getEl('boardMobileHeader');
-        const desktopHost = ctx.getEl('group-target-actions');
-        if (!actions || !mobileHost) return;
-        const useMobileHeader = window.matchMedia('(max-width: 767px)').matches || !desktopHost;
-        if (useMobileHeader) {
-            if (actions.parentElement !== mobileHost) mobileHost.appendChild(actions);
-            actions.classList.remove('hiddenboard-actions-in-group');
-            actions.classList.add('hiddenboard-actions-in-header');
-        } else {
-            if (actions.parentElement !== desktopHost) desktopHost.insertBefore(actions, desktopHost.firstChild);
-            actions.classList.remove('hiddenboard-actions-in-header');
-            actions.classList.add('hiddenboard-actions-in-group');
-        }
-    }
-
-    // Reconcile existing nodes rather than detaching every card on each update.
-    function reconcileChildren(parent, children) {
-        let cursor = parent.firstElementChild;
-        for (const child of children) {
-            if (child === cursor) cursor = cursor.nextElementSibling;
-            else parent.insertBefore(child, cursor);
-        }
-        while (cursor) { const next = cursor.nextElementSibling; cursor.remove(); cursor = next; }
-    }
-
-    function updateGridPages(grid, items, onlyVisible) {
-        const key = items.map(el => `${el.id}:${onlyVisible && el.style.display === 'none' ? 0 : 1}`).join('|');
-        if (grid._pageKey === key) return;
-        const shown = onlyVisible ? items.filter(el => el.style.display !== 'none') : items;
-        const hidden = onlyVisible ? items.filter(el => el.style.display === 'none') : [];
-        const pages = Array.from(grid.children).filter(el => el.classList.contains('hiddenboard-page'));
-        const nextPages = [];
-        for (let i = 0; i < shown.length; i += 6) {
-            const page = pages[i / 6] || document.createElement('div');
-            page.className = 'hiddenboard-page';
-            reconcileChildren(page, shown.slice(i, i + 6));
-            nextPages.push(page);
-        }
-        reconcileChildren(grid, [...hidden, ...nextPages]);
-        grid._pageKey = key;
-    }
-
-    // 조합 진행도 차감을 적용한 상위조합 수량: 화면 표시 전용 계산.
     function getHiddenboardReasonDisplayEntries(slotId, rMap, reqMap) {
         const getReasonParentNeed = (info) => {
             if (!info?.parentUid) return 0;
@@ -300,7 +204,6 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
             .map(entry => [entry.rId, { ...entry.info, displayQty: entry.displayQty, _reasonOrder: entry.index }]);
     }
 
-    // 카드 상위조합·조합 조건 표시는 재료 배치/완료 상태 변경과 분리한다.
     function renderHiddenboardSlotReasons({ id, slotEl, needed, isTarget, isMergedSlot, reasonMap, getCachedReasonEntries, targetHighlight, highlightDeps }) {
         const getReasonTagClass = (info) => info?.tagClass || ctx.DEFAULT_REASON_TAG_CLASS;
         const isSplitReason = (info) => info?.depth !== 0 && !!info?.reasonCenterHtml;
@@ -375,7 +278,9 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         }
     }
 
-    // 루트 목표로부터의 조합 깊이는 히든보드 배치에만 사용한다.
+
+    /* ── 04 · 재료 깊이·정렬·그룹 표시 ── */
+
     function getHiddenboardDepths(mergedSlots) {
         const exactDepths = new Map();
         let queue = [];
@@ -493,6 +398,9 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
             ctx._highlightGroupState = null;
         }
     }
+
+
+    /* ── 05 · 보드 갱신 ── */
 
     function updateHiddenboard(calcResult) {
         if (!ctx._isHiddenboardRendered) return;
@@ -669,6 +577,9 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         if (board && board.scrollTop !== scrollTop) board.scrollTop = scrollTop;
     }
 
+
+    /* ── 06 · 완료 후보·처리·복구 ── */
+
     function getHiddenboardRecipeCompletionCandidates(baseMap) {
         const depths = ctx.getBoardDependencyDepths();
         const candidates = new Map();
@@ -738,5 +649,108 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         ctx._currentHighlight = null;
         return true;
     }
+
+    function completeUnit(uid, amount) {
+        if (ctx._completeLock.has(uid)) return;
+        ctx._completeLock.add(uid);
+        const cWrapEl = document.getElementById(`craft-wrap-${uid}`);
+        const lockBtns = cWrapEl ? Array.from(cWrapEl.querySelectorAll('button')) : [];
+        lockBtns.forEach(b => b.disabled = true);
+        try {
+            const { reqMap, baseMap, autoCostReq } = ctx.calculateBoardRequirements();
+            const isTarget = ctx.activeUnits.has(uid);
+            const isAutoCost = ctx.AUTO_COST_SLOT_SET.has(uid);
+            let isMergedSlot = false;
+            if (isTarget && !isAutoCost) {
+                ctx.activeUnits.forEach((_, activeId) => {
+                    if (activeId !== uid && ctx.unitMap.get(activeId)?.parsedRecipe?.some(pr => pr.id === uid)) isMergedSlot = true;
+                });
+            }
+            const isPureTarget = isTarget && !isMergedSlot && !isAutoCost;
+            let reqVal = 0;
+            if (isPureTarget) reqVal = Math.max(0, (ctx.activeUnits.get(uid) || 1) - (ctx.completedUnits.get(uid) || 0));
+            else if (isAutoCost) reqVal = autoCostReq[uid] || 0;
+            else if (isTarget && isMergedSlot) reqVal = Math.max(0, (baseMap.get(uid) || 1) - (ctx.completedUnits.get(uid) || 0));
+            else reqVal = reqMap.get(uid) || 0;
+
+            const requestedQty = amount !== undefined ? parseInt(amount, 10) : reqVal;
+            const processQty = requestedQty === 10 && reqVal < 10 ? 0 : Math.min(requestedQty, reqVal);
+            if (processQty > 0) {
+                const prevCompleted = ctx.completedUnits.get(uid) || 0;
+                ctx.deleteCompletedRecipe(uid, processQty);
+                const newComp = Math.max(prevCompleted, ctx.completedUnits.get(uid) || 0) + processQty;
+                ctx.completedUnits.set(uid, newComp);
+
+                if (isPureTarget) {
+                    if (newComp >= (ctx.activeUnits.get(uid) || 1)) {
+                        ctx.completedTargets.set(uid, ctx.activeUnits.get(uid) || 1);
+                        ctx.activeUnits.delete(uid);
+                        ctx.completedUnits.delete(uid);
+                    }
+                } else if (isTarget && isMergedSlot) {
+                    const totalQty = baseMap.get(uid) || 1;
+                    if (newComp >= totalQty) {
+                        const activeQty = ctx.activeUnits.get(uid) || 1;
+                        const matQty = totalQty - activeQty;
+                        ctx.completedTargets.set(uid, activeQty);
+                        ctx.activeUnits.delete(uid);
+                        if (matQty > 0) ctx.completedUnits.set(uid, matQty);
+                        else ctx.completedUnits.delete(uid);
+                    }
+                }
+                completeHiddenboardRecipeUnitsIfReady();
+                ctx.commitNexusStateChange({ clearHighlight: true });
+            } else {
+                lockBtns.forEach(b => b.disabled = false);
+            }
+        } catch {
+            lockBtns.forEach(b => b.disabled = false);
+        } finally {
+            setTimeout(() => { ctx._completeLock.delete(uid); }, ctx.APP_INTERNAL.completeLockDelay);
+        }
+    }
+
+    function resetGroupCompleted(level) {
+        const ids = ctx.getGroupRestoreIds(level);
+        if (ids.size === 0) return;
+        if (level >= 5) {
+            const targetEntries = Array.from(ctx.completedTargets.entries());
+            ctx.completedTargets.clear();
+            targetEntries.forEach(([uid, qty]) => {
+                ctx.setActiveUnitQty(uid, (ctx.activeUnits.get(uid) || 0) + qty);
+            });
+            ctx.completedUnits.clear();
+            ctx._selectionResetRetainedCompleted.clear();
+            ctx._invenboardAutoCompletedUnits.clear();
+            ctx._invenboardManualInputs.clear();
+            ctx._presetUsed.clear(); ctx.updatePresetBtns();
+        } else {
+            ctx.resetCompletedMaterialsByLevel(level);
+        }
+        const label = ctx.GROUP_DEFS.find(group => group.resetLevel === level)?.resetLabel || '완료 복구';
+        ctx.showActionFeedback(`${label} · ${ids.size}종 복구됨 ✓`);
+        ctx.commitNexusStateChange({ clearHighlight: true });
+    }
+
+    function getGroupRestoreDescription(level) {
+        if (level >= 5) return '완료된 목표를 선택 목록으로 돌리고, 모든 재료의 완료·보유량을 초기화합니다. 보류 목록은 유지합니다.';
+        if (level >= 4) return '직속·히든·기본 재료의 완료 상태를 함께 복구합니다. 목표와 보류 목록은 유지합니다.';
+        if (level >= 3) return '히든·기본 재료의 완료 상태를 함께 복구합니다. 목표와 보류 목록은 유지합니다.';
+        return '기본 재료의 완료 상태만 복구합니다. 목표와 보류 목록은 유지합니다.';
+    }
+
+    function updateGroupRestoreButtons() {
+        document.querySelectorAll('.grp-title-actions [data-action="resetGroup"]').forEach(btn => {
+            const level = parseInt(btn.dataset.level, 10), count = ctx.getGroupRestoreIds(level).size;
+            const description = getGroupRestoreDescription(level);
+            btn.disabled = count === 0;
+            btn.title = `${description} · ${count > 0 ? `복구 대상 ${count}종` : '복구할 항목 없음'}`;
+        });
+    }
+
+
+    /* ── 공개 API ── */
+
     return { completeHiddenboardRecipeUnitsIfReady, completeUnit, placeHiddenboardControls, renderHiddenboard, resetGroupCompleted, returnHiddenboardControlsToHeader, switchHiddenboardDetail, updateHiddenboard };
+
 };
