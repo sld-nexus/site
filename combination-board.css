@@ -84,7 +84,6 @@
 .d-detail-meta { min-width:0; color:var(--text-muted); font-size:calc(10px * var(--fs-scale)); line-height:1.4; text-align:right; overflow-wrap:anywhere; }
 .d-recipe-meta,.hiddenboard-slot[data-detail-view="recipe"] .d-usage-hint { display:none; }
 .hiddenboard-slot[data-detail-view="recipe"] .d-recipe-meta { display:block; }
-/* 카드 내부에는 스크롤을 만들지 않고 모든 내용을 바깥 보드에 표시한다. */
 .d-detail-panels { display:block; min-width:0; max-height:none; overflow:visible; }
 .d-reason-wrap,.d-recipe-wrap { grid-area:1 / 1; display:flex; flex-direction:column; min-width:0; gap:2px; padding:2px 14px 9px; }
 .d-detail-panels > [aria-hidden="true"] { display:none; }

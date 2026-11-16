@@ -210,6 +210,7 @@
     const unitMap = new Map(), activeUnits = new Map(), pausedUnits = new Map(), completedUnits = new Map(), depCache = new Map();
     const completedTargets = new Map(), _unitNativeLevels = new Map(), _unitRestoreLevels = new Map();
     const _selectionResetRetainedCompleted = new Map();
+    const _materialCompletedTargets = new Map();
     const _materialManualInputs = new Map();
     let _actionFeedbackTimer = null;
     const _depVisiting = new Set();
@@ -328,7 +329,6 @@
         });
     }
 
-
     function sanitizeRuntimeState() {
         const normalizeMap = (map, options = {}) => {
             for (const [rawUid, rawQty] of [...map.entries()]) {
@@ -341,6 +341,7 @@
         normalizeMap(completedTargets);
         normalizeMap(completedUnits, { allowAutoCost: true, keepCompletedQty: true });
         pruneSelectionResetRetainedCompleted();
+        pruneMaterialCompletedTargets();
         activeUnits.forEach((_, uid) => pausedUnits.delete(uid));
         completedTargets.forEach((_, uid) => {
             activeUnits.delete(uid);
@@ -371,6 +372,7 @@
             completed: [...completedUnits],
             selectionResetRetainedCompleted: [..._selectionResetRetainedCompleted],
             completedTargets: [...completedTargets],
+            materialCompletedTargets: [..._materialCompletedTargets],
             cartTab: _cartTab,
             presetUsed: [..._presetUsed],
             hideCompleted: _hideCompleted,
@@ -389,6 +391,7 @@
             pausedUnits.clear();
             completedUnits.clear();
             _selectionResetRetainedCompleted.clear();
+            _materialCompletedTargets.clear();
             completedTargets.clear();
             _presetUsed.clear();
             _materialManualInputs.clear();
@@ -398,6 +401,7 @@
             hydrateSavedUnitMap(state.completed, completedUnits, { allowAutoCost: true, keepCompletedQty: true });
             hydrateSavedUnitMap(state.selectionResetRetainedCompleted, _selectionResetRetainedCompleted, { allowAutoCost: true, keepCompletedQty: true });
             hydrateSavedUnitMap(state.completedTargets, completedTargets);
+            hydrateSavedUnitMap(state.materialCompletedTargets, _materialCompletedTargets);
             for (const [rawId, rawQty] of (Array.isArray(state.materialManualInputs) ? state.materialManualInputs : (state.invenboardManualInputs || []))) {
                 const id = normalizeSavedId(rawId), qty = Math.max(0, parseInt(rawQty, 10) || 0);
                 if (MATERIAL_ALL_ATOMS.some(atom => clean(atom) === id) && qty > 0) _materialManualInputs.set(id, qty);
@@ -418,6 +422,7 @@
             pausedUnits.clear();
             completedUnits.clear();
             _selectionResetRetainedCompleted.clear();
+            _materialCompletedTargets.clear();
             completedTargets.clear();
             _presetUsed.clear();
             _materialManualInputs.clear();
@@ -461,6 +466,7 @@
         if (updateTimer !== null) return;
         updateTimer = requestAnimationFrame(() => {
             updateTimer = null;
+            pruneMaterialCompletedTargets();
             let calcResult = calculateBoardRequirements();
             let costboardTotals = calculateCostboardAtomTotals();
             if (clampCompletedUnits(calcResult, costboardTotals)) {
@@ -803,7 +809,6 @@
     const createMaterialReasonInfo = (parentUid, options = {}) => createHiddenboardReasonInfo(parentUid, name => escapeHtml(name), options);
     const createToolReasonInfo = (parentUid, options = {}) => createHiddenboardReasonInfo(parentUid, name => `${escapeHtml(name)} ${TOOL_REASON_LABEL_HTML}`, options);
 
-
     function splitRecipe(recipeStr) {
         let parts = [], current = '', depth = 0;
         for (let char of recipeStr) {
@@ -861,7 +866,6 @@
         const specialCondInlineHtml = foundSpecialIds.length > 0 ? `<div class="tsc-wrap">${foundSpecialIds.map(uid => `<div class="tsc-item">${CLEAN_SPECIAL_CONDITIONS[uid]}</div>`).join('')}</div>` : '';
         return `<div class="recipe-vertical">${partsHtml}</div>${specialCondInlineHtml}`;
     }
-
 
     /* 계산 엔진 및 패널 갱신 */
     function calcEssenceRecursiveFast(uid, counts, visited) {
@@ -998,6 +1002,13 @@
        06. 완료·복구·초기화
        ========================================================================== */
 
+    // 재료 체크 전체 완료에서 이동한 목표만 초기화 시 복구하도록 추적한다.
+    function pruneMaterialCompletedTargets() {
+        for (const [uid, qty] of _materialCompletedTargets) {
+            if (completedTargets.get(uid) !== qty) _materialCompletedTargets.delete(uid);
+        }
+    }
+
     // 선택 초기화로 보존한 진행도는 필요량 재계산이나 새로고침으로 지우지 않는다.
     function pruneSelectionResetRetainedCompleted() {
         for (const [uid, qty] of _selectionResetRetainedCompleted) {
@@ -1011,6 +1022,9 @@
         pruneSelectionResetRetainedCompleted();
         const { baseMap, baseAutoCostReq } = calcResult || calculateBoardRequirements();
         const resolvedCostboardTotals = costboardTotals || calculateCostboardAtomTotals();
+        const materialTotals = _materialCompletedTargets.size
+            ? [materialBoard.calculateTotals(false), materialBoard.calculateTotals(true)]
+            : [];
         let changed = false;
         for (let [uid, rawQty] of [...completedUnits.entries()]) {
             const compQty = parseInt(rawQty, 10);
@@ -1021,13 +1035,14 @@
                 changed = true;
                 continue;
             }
+            const materialMax = isCostboardAtom ? Math.max(0, ...materialTotals.map(totals => totals.targetMap[getCostboardAtomRawName(uid)] || 0)) : 0;
             if (activeUnits.has(uid)) {
-                let maxAllow = Math.max(baseMap.get(uid) || activeUnits.get(uid) || 1, _selectionResetRetainedCompleted.get(uid) || 0);
+                let maxAllow = Math.max(baseMap.get(uid) || activeUnits.get(uid) || 1, _selectionResetRetainedCompleted.get(uid) || 0, materialMax);
                 if (compQty > maxAllow) { completedUnits.set(uid, maxAllow); changed = true; }
                 continue;
             }
             let maxAllow = isUnitSlot ? (baseMap.get(uid) || 0) : (resolvedCostboardTotals.targetMap[getCostboardAtomRawName(uid)] || baseAutoCostReq[uid] || 0);
-            maxAllow = Math.max(maxAllow, _selectionResetRetainedCompleted.get(uid) || 0);
+            maxAllow = Math.max(maxAllow, _selectionResetRetainedCompleted.get(uid) || 0, materialMax);
             if (compQty > maxAllow) {
                 if (maxAllow <= 0) completedUnits.delete(uid);
                 else completedUnits.set(uid, maxAllow);
@@ -1073,14 +1088,6 @@
         return ids;
     }
 
-    
-
-
-
-    
-
-
-
     function subtractCompletedUnitQty(uid, qty) {
         const amount = Math.max(0, parseInt(qty, 10) || 0);
         if (amount <= 0) return;
@@ -1111,6 +1118,7 @@
         if (!completedTargets.has(uid) || !unitMap.has(uid)) return false;
         const qty = completedTargets.get(uid) || 1;
         completedTargets.delete(uid);
+        _materialCompletedTargets.delete(uid);
         deleteCompletedRecipe(uid, qty);
         completedUnits.delete(uid);
         if (restoreToActive) setActiveUnitQty(uid, qty);
@@ -1125,10 +1133,7 @@
         return releaseCompletedTarget(uid);
     }
 
-    
     let completeUnit;
-
-
 
     function restoreUnit(uid) {
         if (!restoreCompletedTarget(uid)) return;
@@ -1157,7 +1162,7 @@
 
         _restoreAllPendingTimer = setTimeout(() => {
             _restoreAllPendingTimer = null;
-            activeUnits.clear(); pausedUnits.clear(); completedUnits.clear(); _selectionResetRetainedCompleted.clear(); completedTargets.clear();
+            activeUnits.clear(); pausedUnits.clear(); completedUnits.clear(); _selectionResetRetainedCompleted.clear(); _materialCompletedTargets.clear(); completedTargets.clear();
             _presetUsed.clear(); updatePresetBtns(); commitNexusStateChange();
             if (!btn || !label) return;
             _restoreAllCooldown = true;
@@ -1178,6 +1183,7 @@
             if (completedTargets.has(uid)) {
                 const qty = completedTargets.get(uid) || 1;
                 completedTargets.delete(uid);
+                _materialCompletedTargets.delete(uid);
                 setActiveUnitQty(uid, (activeUnits.get(uid) || 0) + qty);
             }
             completedUnits.delete(uid);
@@ -1185,10 +1191,7 @@
         });
     }
 
-    
     let resetGroupCompleted;
-
-
 
     function resetUnitboard() {
         if (activeUnits.size === 0) return;
@@ -1317,8 +1320,9 @@
         });
     }
 
-    function toggleBuildMaterialMode() {
-        _buildMaterialsExpanded = !_buildMaterialsExpanded;
+    function setBuildMaterialMode(isExpanded) {
+        if (_buildMaterialsExpanded === !!isExpanded) return;
+        _buildMaterialsExpanded = !!isExpanded;
         renderCostboardAtoms();
         const label = getEl('buildMaterialModeBtn');
         if (label) {
@@ -1328,6 +1332,7 @@
         getEl('costboardGrid')?.classList.toggle('is-expanded', _buildMaterialsExpanded);
         updateCostboard();
     }
+    function toggleBuildMaterialMode() { setBuildMaterialMode(!_buildMaterialsExpanded); }
 
     /* ==========================================================================
        08. 히든 보드
@@ -1356,7 +1361,6 @@
         });
         return hasRequirement ? Math.max(0, readyQty) : 0;
     }
-
 
     /* ==========================================================================
        10. 유닛 도감·즐겨찾기
@@ -1503,7 +1507,6 @@
                 ...conditions, quantity].filter(Boolean).join(' · ');
         });
         const special = [...card.querySelectorAll('.uc-recipe-area .tsc-item')].map(read).filter(Boolean);
-        // 한 줄 입력란이 줄바꿈을 제거해도 항목 경계를 유지한다.
         return [`유닛명: ${name}`, ...notes,
             `조합 조건: ${recipe.length ? recipe.join(' / ') : '정보 없음'}`,
             ...(special.length ? ['특수 조건: ' + special.join(' / ')] : [])].join(' | ');
@@ -1585,14 +1588,12 @@
         tc.innerHTML = groups.map(([key, index]) => `<div id="cat-group-${key}" class="cat-group" role="tabpanel" aria-labelledby="tab-btn-${index}"></div>`).join('');
         _isTabContentInitialized = true;
         _unitboardDomIndexed = false;
-        // 화면 크기 전환 시 카드 묶음 수만 다시 계산하며 선택·저장 상태는 유지합니다.
         UNITBOARD_MOBILE_PAGING.addEventListener('change', () => {
             tc.querySelectorAll('.cat-group[data-rendered]').forEach(group => { group.dataset.rendered = ''; });
             renderCurrentTabContent();
         });
     }
 
-    // Keep already visited tabs; create cards only when that category is opened.
     function ensureUnitboardCategory(key) {
         const group = getEl(`cat-group-${key}`);
         if (!group || group.dataset.rendered === '1') return;
@@ -1698,6 +1699,7 @@
     function toggleUnitSelection(id, forceQty) {
         if (!unitMap.has(id) || isRestrictedUnit(id)) return;
         if (activeUnits.has(id)) activeUnits.delete(id);
+        else if (_materialCompletedTargets.has(id) && completedTargets.has(id)) restoreCompletedTarget(id);
         else setActiveUnitQty(id, forceQty || pausedUnits.get(id) || 1);
         debouncedUpdateAllPanels();
     }
@@ -1732,7 +1734,6 @@
        11. 나의 조합·독립 창·선택 목록
        ========================================================================== */
 
-
     /* 나의 조합 · 필요 재료 독립 창: 원본 탭에 의존하지 않는 자체 페이지 */
     function updateBuildWindowButton() {
         const button = getEl('btnBuildStandalone');
@@ -1742,7 +1743,6 @@
     }
 
     function openBuildIndependentWindow() {
-        // 클릭 이벤트에서 주소가 있는 새 창을 직접 열어 독립 실행한다.
         if (_buildStandaloneWindow && !_buildStandaloneWindow.closed) {
             _buildStandaloneWindow.focus();
             return;
@@ -1932,7 +1932,9 @@
                 : `<button type="button" class="cart-done-restore-hint" data-action="${paused ? 'restorePausedUnit' : 'restoreUnit'}" data-uid="${item.id}">복구</button>`;
             return `<div class="cart-item${meta[5]}" id="${prefix}${meta[4]}-${item.id}"><div class="cart-unit-info"><span class="cart-item-grade"><span class="gtag grade-${item.grade}">${item.grade}</span></span><span class="cart-item-name${!active && !paused ? ' done-name' : ''}" ${getUnitNameStyle(item)}>${item.name}</span></div>${quantity}${control}<button type="button" class="cart-item-del" data-action="${active ? 'removeActiveUnit' : paused ? 'removePausedUnit' : 'removeCompletedUnit'}" data-uid="${item.id}">제거</button></div>`;
         }).join('');
-        setHTMLIfChanged(list, actions + (rows || `<div class="cart-empty-msg">${meta[2]}<br><span class="cart-empty-sub">${meta[3]}</span></div>`));
+        const headerActions = getEl('cartHeaderActions');
+        if (headerActions) setHTMLIfChanged(headerActions, actions);
+        setHTMLIfChanged(list, rows || `<div class="cart-empty-msg">${meta[2]}<br><span class="cart-empty-sub">${meta[3]}</span></div>`);
     }
 
     function updateCartUI() {
@@ -1944,7 +1946,6 @@
        12. 화면 전환·보드 조정
        ========================================================================== */
 
-
     const renderNexusHeaderVersion = () => {
         const versionText = getEl('ghTitleVersion');
         if (!versionText) return;
@@ -1955,7 +1956,6 @@
     function updateBoardHeader() {
         const hiddenboardActions = getEl('hiddenboardGlobalActions');
         if (hiddenboardActions) hiddenboardActions.hidden = _currentViewMode !== 'hiddenboard';
-        // 카드가 스크롤 밖으로 나가도 현재 추적 대상과 해제 방법을 확인합니다.
         let trackingStatus = getEl('hiddenboardTrackingStatus');
         const board = getEl('boardContent');
         if (!trackingStatus && board) {
@@ -1971,7 +1971,6 @@
             getEl('hiddenboardTrackingName').textContent = _currentHighlight ? (unitMap.get(_currentHighlight)?.name || _currentHighlight) : '';
         }
     }
-
 
     function updateBoardPanel(calcResult) {
         updateBoardHeader();
@@ -2338,6 +2337,7 @@
         get AUTO_COST_SLOT_SET() { return AUTO_COST_SLOT_SET; },
         get LEGACY_COMPLETION_ATOMS() { return LEGACY_COMPLETION_ATOMS; },
         get _materialManualInputs() { return _materialManualInputs; },
+        get _materialCompletedTargets() { return _materialCompletedTargets; },
         get CLEAN_SPECIAL_CONDITIONS() { return CLEAN_SPECIAL_CONDITIONS; },
         get CLEAN_UNIT_QTY_CAPS() { return CLEAN_UNIT_QTY_CAPS; },
         get COSTBOARD_DISPLAY_SLOT_DEFS() { return COSTBOARD_DISPLAY_SLOT_DEFS; },
@@ -2408,6 +2408,7 @@
         get returnHiddenboardControlsToHeader() { return returnHiddenboardControlsToHeader; },
         get selectTab() { return selectTab; },
         get setActiveUnitQty() { return setActiveUnitQty; },
+        get setBuildMaterialMode() { return setBuildMaterialMode; },
         get showActionFeedback() { return showActionFeedback; },
         get switchLayout() { return switchLayout; },
         get titleToGridId() { return titleToGridId; },
@@ -2418,7 +2419,6 @@
     ({ completeGroup, completeUnit, placeHiddenboardControls, renderHiddenboard, resetGroupCompleted, returnHiddenboardControlsToHeader, switchHiddenboardDetail, updateHiddenboard } = window.NEXUS_HIDDEN(boardModuleContext));
     materialBoard = window.NEXUS_MATERIAL(boardModuleContext);
     ({ bindSwipeEvents, updatePivotColumns } = window.NEXUS_RESPONSIVE(boardModuleContext));
-
 
     /* 부팅 상태 전달 */
     const markNexusAppReady = () => {

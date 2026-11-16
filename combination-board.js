@@ -2,11 +2,11 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
     'use strict';
     const { setHTMLIfChanged } = ctx;
 
+    /* ── 01 · 카드·페이지 DOM 재사용 ── */
+
     const BASIC_HIDDENBOARD_GRADES = new Set(["레어", "에픽", "유니크", "헬", "레전드"]);
 
     const isBasicHiddenboardGrade = (grade) => BASIC_HIDDENBOARD_GRADES.has(grade);
-
-    /* ── 01 · 카드·페이지 DOM 재사용 ── */
 
     function reconcileChildren(parent, children) {
         let cursor = parent.firstElementChild;
@@ -108,7 +108,6 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         ctx._hiddenboardSlotElsByUid.clear();
         boardEl.querySelectorAll('.hiddenboard-slot[data-uid]').forEach(el => ctx._hiddenboardSlotElsByUid.set(el.dataset.uid, el));
         ctx._isHiddenboardRendered = true;
-        // 모바일 2장 묶음과 태블릿 6장 묶음 간 전환 시 기본 재료의 등급별 페이지를 다시 배치합니다.
         if (!isPagingListenerBound) {
             HIDDENBOARD_MOBILE_PAGING.addEventListener('change', () => {
                 if (ctx._isHiddenboardRendered) updateHiddenboard(ctx._lastCalcResult || ctx.calculateBoardRequirements());
@@ -141,7 +140,6 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         const inGroup = !HIDDENBOARD_MOBILE_PAGING.matches && !!desktopHost;
         mountHiddenboardControls(actions, inGroup ? desktopHost : header, inGroup);
     }
-
 
     /* ── 03 · 조합법·상위조합·조건 표시 ── */
 
@@ -307,7 +305,6 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         }
     }
 
-
     /* ── 04 · 재료 깊이·정렬·그룹 표시 ── */
 
     function getHiddenboardDepths(mergedSlots) {
@@ -427,7 +424,6 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
             ctx._highlightGroupState = null;
         }
     }
-
 
     /* ── 05 · 보드 갱신 ── */
 
@@ -564,7 +560,6 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
             const gridId = tGrid?.id || '';
             ctx._unitRestoreLevels.set(id, restoreLevelsByGridId[gridId] || 0);
             const keepCompletedVisible = excludeGridIds.includes(gridId);
-            // 추적 대상과 그 재료만 표시하여 그리드를 빈자리 없이 다시 배치합니다.
             const outsideTracking = !!targetHighlight && !highlightDeps?.has(id);
             const hideT = outsideTracking || (ctx._hideCompleted && isCompleted && !keepCompletedVisible);
             if (tGrid) {
@@ -579,7 +574,6 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
                 usedSlots.add(slotEl);
             }
 
-            
             return tGrid;
         };
 
@@ -611,7 +605,6 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         updateGroupActionButtons();
         if (board && board.scrollTop !== scrollTop) board.scrollTop = scrollTop;
     }
-
 
     /* ── 06 · 완료 후보·처리·복구 ── */
 
@@ -799,7 +792,6 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
             }
         });
     }
-
 
     /* ── 공개 API ── */
 

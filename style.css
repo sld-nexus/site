@@ -133,9 +133,6 @@ html.nexus-standalone-build,html.nexus-standalone-build body { height:auto; min-
 .costboard-grid.is-expanded { grid-template-rows:none; grid-auto-rows:minmax(43px,auto); align-content:start; }
 .build-materials:has(.costboard-grid.is-expanded) .costboard-section { height:auto; min-height:240px; }
 
-.cart-list-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 17px 7px; }
-.cart-list-heading h3 { font-size:12px; color:#eedcc0; }
-
 .main-layout.view-unitboard .panel-right,.main-layout:is(.view-hiddenboard,.view-invenboard) .panel-left { display:none; }
 .panel-body { min-height:0; overflow-y:auto; overflow-x:hidden; }
 @media (max-width:1200px) and (min-width:768px) {
@@ -286,7 +283,7 @@ html.nexus-standalone-build,html.nexus-standalone-build body { height:auto; min-
 .unitboard-page { display:contents; }
 .unit-card,.hiddenboard-slot { --card-surface:#111216; --card-surface-selected:var(--state-surface); --card-state-border:var(--state-ink); background:var(--card-surface); border:1px solid color-mix(in srgb,var(--card-tone,var(--accent)) 72%,transparent); border-radius:12px; }
 .unit-card { min-width:0; display:flex; flex-direction:column; position:relative; overflow:hidden; cursor:pointer; transition:background .18s,border-color .18s,box-shadow .18s,transform .18s; }
-/* 기본 테두리의 등급색 */
+/* 카드 등급별 색상 */
 .unit-card[data-grade="기초"],.hiddenboard-slot:has(>.d-slot-main .grade-기초),.cart-item:has(>.cart-unit-info .grade-기초) { --card-tone:var(--grade-basic); }
 .unit-card[data-grade="매직"],.hiddenboard-slot:has(>.d-slot-main .grade-매직),.cart-item:has(>.cart-unit-info .grade-매직) { --card-tone:var(--grade-magic); }
 .unit-card[data-grade="레어"],.hiddenboard-slot:has(>.d-slot-main .grade-레어),.cart-item:has(>.cart-unit-info .grade-레어) { --card-tone:var(--grade-rare); }
@@ -317,6 +314,15 @@ html.nexus-standalone-build,html.nexus-standalone-build body { height:auto; min-
 .grade-스킬사용{border-color:rgba(255,255,255,0.92);color:var(--grade-skill-use);background:rgba(255,255,255,0.12);}
 .uc-fav-btn { position:absolute; right:0; top:50%; transform:translateY(-50%); margin-left:auto; width:23px; height:23px; border:0; background:transparent; color:#bfc5d1; font-size:21px; line-height:1; }
 .uc-fav-btn:hover,.uc-fav-btn.is-fav { color:#f4ddba;  text-shadow:0 0 10px #d8aa4938; }
+.unit-card .uc-head { position:relative;min-height:76px;padding-right:46px; }
+.unit-card .uc-meta-row { padding-right:0;flex-wrap:wrap; }
+.uc-card-actions { position:absolute;top:7px;right:7px;display:flex;flex-direction:column;align-items:center;gap:3px; }
+.unit-card .uc-card-actions .uc-fav-btn { position:relative;transform:none;margin:0;width:28px;height:28px;display:grid;place-items:center; }
+.uc-copy-btn { position:relative;display:grid;place-items:center;width:28px;height:28px;padding:5px;border:0;border-radius:5px;background:transparent;color:#aeb5c4;cursor:pointer; }
+.uc-copy-btn svg { width:17px;height:17px; }
+.uc-copy-btn:hover { color:#f4ddba;background:#ffffff08; }
+.uc-copy-btn:active { background:#efd3a414; }
+.uc-copy-btn:focus-visible { outline:2px solid var(--accent);outline-offset:1px; }
 .uc-name-row { font-size:calc(17px * var(--fs-scale)); color:#f0f1f5; line-height:1.45; letter-spacing:-.65px; word-break:keep-all; overflow-wrap:anywhere; }
 .uc-notes { display:flex; flex-direction:column; gap:4px; margin-top:8px; }
 .uc-head .uc-notes,.uc-head .uc-essence-summary { margin-top:10px; }
@@ -429,6 +435,10 @@ html.nexus-standalone-build,html.nexus-standalone-build body { height:auto; min-
 @media (max-width:1024px), (min-width:1025px) and (max-aspect-ratio:11/10), (hover:none) and (pointer:coarse) {
     html:not(.nexus-standalone-build) .inspector-window-controls { display:none; }
 }
+.cart-list-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 17px 7px; }
+.cart-list-heading h3 { flex:none; font-size:calc(15px * var(--fs-scale)); letter-spacing:-.5px; color:#ead7ad; }
+.cart-list-heading .cart-tab-action-row { min-width:0; gap:16px; margin:0; }
+.cart-list-heading .cart-tab-action-btn + .cart-tab-action-btn::before { left:-9px; }
 .cart-section { display:flex; flex-direction:column; min-height:0; }
 .cart-essence-summary { padding:0 17px 15px; flex-shrink:0; }
 .cart-essence-title { margin-bottom:9px; color:#bfc5d1; font-size:10px; }
@@ -454,7 +464,14 @@ html.nexus-standalone-build,html.nexus-standalone-build body { height:auto; min-
 .cart-tab-action-btn.is-danger:hover:not(:disabled) { color:#ffd0ca; }
 .cart-tab-action-btn:disabled { opacity:.38; cursor:default; }
 .cart-tab-action-btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-@media (max-width:767px) { .cart-tab-action-btn { min-height:44px; } }
+@media (max-width:767px) {
+    .cart-tab-action-btn { min-height:44px; }
+    .cart-list-heading { gap:5px; padding-inline:12px; }
+    .cart-list-heading .cart-tab-action-row { gap:12px; }
+    .cart-list-heading .cart-tab-action-btn { gap:3px; font-size:9px; }
+    .cart-list-heading .cart-tab-action-btn svg { width:12px; height:12px; }
+    .cart-list-heading .cart-tab-action-btn + .cart-tab-action-btn::before { left:-7px; }
+}
 .cart-empty-msg { margin:auto 0; padding:24px 0; font-size:11px; color:#bfc5d1; text-align:center; line-height:1.9; }
 .cart-empty-msg::before { content:"+"; display:flex; align-items:center; justify-content:center; width:34px; height:34px; margin:0 auto 13px; border:1px dashed #303139; border-radius:50%; font-size:20px; font-weight:300; color:#bfc5d1; }
 .cart-empty-sub { font-size:9px; color:#bfc5d1; }
@@ -485,8 +502,6 @@ html.nexus-standalone-build,html.nexus-standalone-build body { height:auto; min-
 }
 
 /* 필요 재료 슬롯 */
-.material-legend { display:flex; align-items:center; gap:4px; font-size:8px; color:#bec6d4; }
-.material-legend i { width:4px; height:4px; border-radius:50%; background:#e6c89e; }
 .costboard-section { height:222px; display:flex; }
 .costboard-grid { flex:1; min-height:0; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); grid-template-rows:repeat(4,minmax(43px,1fr)); gap:5px; }
 .costboard-slot { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; min-width:0; padding:6px 2px; border:1px solid #625337; border-radius:7px; background:#101115; }
@@ -573,7 +588,7 @@ html.nexus-standalone-build,html.nexus-standalone-build body { height:auto; min-
 @media(max-width:767px){.global-header .gh-left{padding-right:158px;}}
 @media(prefers-reduced-motion:reduce){.global-header .gh-right .gh-tool-btn[data-nexus-tooltip]::after,.uc-card-actions :is(.uc-fav-btn,.uc-copy-btn)[data-nexus-tooltip]::after{transition:none;}}
 
-/* 동작 결과는 기존 보드의 위치를 바꾸지 않고 표시한다. */
+/* 작업 결과 안내 */
 .action-feedback { position:fixed; left:50%; bottom:max(24px,env(safe-area-inset-bottom)); z-index:22000;
     max-width:calc(100vw - 24px); padding:11px 16px; border:1px solid #a48a58; border-radius:9px;
     background:#191711; color:#f0ddbc; font-size:12px; line-height:1.5; text-align:center;
@@ -591,17 +606,3 @@ html.nexus-standalone-build,html.nexus-standalone-build body { height:auto; min-
 @media (min-width:1025px) and (min-aspect-ratio:11/10) and (hover:hover) and (pointer:fine) {
     #tabContent,#boardContent,.build-inspector { overscroll-behavior-y:contain; }
 }
-
-/* 유닛도감 정보 복사 UI · 히든보드에는 적용하지 않는다. */
-/* 01 · 헤더 오른쪽 작업 영역·세로 정렬 */
-.unit-card .uc-head { position:relative;min-height:76px;padding-right:46px; }
-.unit-card .uc-meta-row { padding-right:0;flex-wrap:wrap; }
-.uc-card-actions { position:absolute;top:7px;right:7px;display:flex;flex-direction:column;align-items:center;gap:3px; }
-.unit-card .uc-card-actions .uc-fav-btn { position:relative;transform:none;margin:0;width:28px;height:28px;display:grid;place-items:center; }
-/* 02 · 복사 아이콘 기본 표시 */
-.uc-copy-btn { position:relative;display:grid;place-items:center;width:28px;height:28px;padding:5px;border:0;border-radius:5px;background:transparent;color:#aeb5c4;cursor:pointer; }
-.uc-copy-btn svg { width:17px;height:17px; }
-/* 03 · 포인터·키보드 상태 */
-.uc-copy-btn:hover { color:#f4ddba;background:#ffffff08; }
-.uc-copy-btn:active { background:#efd3a414; }
-.uc-copy-btn:focus-visible { outline:2px solid var(--accent);outline-offset:1px; }

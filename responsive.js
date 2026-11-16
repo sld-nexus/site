@@ -1,6 +1,6 @@
 window.NEXUS_RESPONSIVE = function createResponsive(ctx) {
     'use strict';
-    let _swipeTimer = null, _isSwiping = false;
+    /* 01. 화면 방향·크기 및 작업 영역 동기화 */
     function updatePivotColumns() {
         const { width, height } = window.screen;
         const pixelRatio = window.devicePixelRatio || 1;
@@ -32,7 +32,8 @@ window.NEXUS_RESPONSIVE = function createResponsive(ctx) {
     window.addEventListener('focus', updatePivotColumns);
     desktopQuery.addEventListener('change', handleViewportChange);
 
-    /* 화면 스와이프 이벤트 */
+    /* 02. 도감·히든보드 터치 탐색 */
+    let _swipeTimer = null, _isSwiping = false;
     function bindSwipeEvents() {
         const sArea = ctx.getEl('tabContent');
         if (sArea) {
@@ -61,7 +62,7 @@ window.NEXUS_RESPONSIVE = function createResponsive(ctx) {
             }, { passive: true });
             sArea.addEventListener('touchend', e => {
                 if (_isSwiping || ctx._unitboardCollection) return;
-                let dX = e.changedTouches[0].screenX - sX, dY = e.changedTouches[0].screenY - sY;
+                const dX = e.changedTouches[0].screenX - sX, dY = e.changedTouches[0].screenY - sY;
                 if (Math.abs(dX) > 70 && Math.abs(dY) < 50) {
                     if (sPager?.type === 'favorite') { sPager = null; return; }
                     if (sPager?.type === 'category' && canPagerMove(sPager, dX)) { sPager = null; return; }

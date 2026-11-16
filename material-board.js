@@ -1,20 +1,21 @@
-/* 재료 체크: V43의 보유량 입력 UI를 V47 공통 계산·수동 완료 정책에 맞춰 이식 */
 window.NEXUS_MATERIAL = function createMaterialBoard(ctx) {
     'use strict';
 
+    /* 01. 재료 정의·보유량 환산 */
     const CORE_ATOMS = Object.freeze([...ctx.SYSTEM_CONFIG.costboardAtoms, ctx.VOID_RAY_ATOM]);
     const ALL_ATOMS = Object.freeze([...CORE_ATOMS, ...ctx.LEGACY_COMPLETION_ATOMS]);
     const ATOM_NAME_BY_ID = new Map(ALL_ATOMS.map(atom => [ctx.clean(atom), atom]));
     const INPUT_STEPS = new Map([[ctx.clean('자동포탑'), 5]]);
     const ALL_IDS = new Set(ALL_ATOMS.map(ctx.clean));
     const CORE_IDS = new Set(CORE_ATOMS.map(ctx.clean));
+    const RECIPE_CORE_IDS = new Set(ctx.SYSTEM_CONFIG.costboardAtoms.map(ctx.clean));
     const BOTTOM_IDS = new Set(['땅거미지뢰', '자동포탑', '우르사돈암', '우르사돈수', ctx.VOID_RAY_ATOM].map(ctx.clean));
     const voidRecipeCache = new Map();
+    const coreRecipeCache = new Map();
     let expanded = false;
     let manual = false;
     let rendered = false;
 
-    // 계산 결과는 공통 calculateCostboardAtomTotals와 해당 캐시 엔진을 재사용한다.
     function countVoidRayInRecipe(uid) {
         if (voidRecipeCache.has(uid)) return voidRecipeCache.get(uid);
         const walk = (id, qty, ancestors, parentId = '') => {
@@ -54,6 +55,50 @@ window.NEXUS_MATERIAL = function createMaterialBoard(ctx) {
 
     function getAtoms(isExpanded = expanded) { return isExpanded ? ALL_ATOMS : CORE_ATOMS; }
 
+    // 전체 재료에 표시되는 상위 유닛 한 개를 핵심 원가로 전개한다.
+    // 입력 기록을 복사해 저장하지 않고, 현재 보유량에서 환산하여 중복 계산을 막는다.
+    function getCoreRecipe(rawId) {
+        const id = ctx.clean(rawId);
+        if (!coreRecipeCache.has(id)) {
+            const completed = ctx.calculateCostboardAtomTotals(new Map([[id, 1]]), ctx.SYSTEM_CONFIG.costboardAtoms).completedMap;
+            coreRecipeCache.set(id, ctx.SYSTEM_CONFIG.costboardAtoms
+                .map(atom => [ctx.clean(atom), Math.max(0, completed[atom] || 0)])
+                .filter(([, qty]) => qty > 0));
+        }
+        return coreRecipeCache.get(id);
+    }
+    function coreStock() {
+        return new Map(ctx.SYSTEM_CONFIG.costboardAtoms.map(atom => [ctx.clean(atom), Math.max(0, ctx.completedUnits.get(ctx.clean(atom)) || 0)]));
+    }
+    function canAssemble(stock, recipe) {
+        return recipe.length ? Math.min(...recipe.map(([id, qty]) => Math.floor((stock.get(id) || 0) / qty))) : 0;
+    }
+    function allocateAssembledTotals(totals, isExpanded) {
+        const stock = coreStock();
+        const parentAtoms = isExpanded ? [ctx.VOID_RAY_ATOM, ...ctx.LEGACY_COMPLETION_ATOMS] : [ctx.VOID_RAY_ATOM];
+        for (const atom of parentAtoms) {
+            const needed = Math.max(0, (totals.targetMap[atom] || 0) - (totals.completedMap[atom] || 0));
+            if (!needed) continue;
+            const recipe = getCoreRecipe(atom);
+            const assembled = Math.min(needed, canAssemble(stock, recipe));
+            if (!assembled) continue;
+            totals.completedMap[atom] = (totals.completedMap[atom] || 0) + assembled;
+            // 전체재료 화면에서는 재료를 한 번만 배정한다. 핵심재료 화면에서는
+            // 상위 재료로 환산해도 핵심 보유량 자체는 그대로 보여준다.
+            if (isExpanded) recipe.forEach(([id, qty]) => stock.set(id, (stock.get(id) || 0) - qty * assembled));
+        }
+        if (isExpanded) {
+            for (const atom of ctx.SYSTEM_CONFIG.costboardAtoms) {
+                const id = ctx.clean(atom);
+                totals.completedMap[atom] = stock.get(id) || 0;
+            }
+        }
+        for (const atom of getAtoms(isExpanded)) {
+            totals.remainingMap[atom] = Math.max(0, (totals.targetMap[atom] || 0) - (totals.completedMap[atom] || 0));
+        }
+        return totals;
+    }
+
     function calculateTotals(isExpanded = expanded, activeSource = getTrackedTargets()) {
         const atoms = isExpanded ? ALL_ATOMS : ctx.SYSTEM_CONFIG.costboardAtoms;
         const totals = ctx.calculateCostboardAtomTotals(ctx.completedUnits, atoms, { activeSource, preferRecipeAtoms: isExpanded });
@@ -65,9 +110,10 @@ window.NEXUS_MATERIAL = function createMaterialBoard(ctx) {
             totals.completedMap[ctx.VOID_RAY_ATOM] = completed;
             totals.remainingMap[ctx.VOID_RAY_ATOM] = target - completed;
         }
-        return totals;
+        return allocateAssembledTotals(totals, isExpanded);
     }
 
+    /* 02. 슬롯 표시·모드 버튼 */
     function gradeOf(atom) {
         return ctx.AUTO_COST_SLOT_SET.has(ctx.clean(atom)) ? '스킬사용' : (ctx.unitMap.get(ctx.clean(atom))?.grade || '');
     }
@@ -137,6 +183,7 @@ window.NEXUS_MATERIAL = function createMaterialBoard(ctx) {
         rendered = true;
         updateModeButtons();
     }
+    /* 03. 보유량·완료 상태 갱신 */
     function refresh() {
         if (!rendered) return;
         const totals = calculateTotals();
@@ -145,15 +192,14 @@ window.NEXUS_MATERIAL = function createMaterialBoard(ctx) {
             if (!item) continue;
             const need = Math.max(0, Number(totals.targetMap[atom]) || 0);
             const owned = Math.min(need, Math.max(0, Number(totals.completedMap[atom]) || 0));
-            const stored = Math.max(0, Number(ctx.completedUnits.get(id)) || 0);
             const manualQty = Math.max(0, Number(ctx._materialManualInputs.get(id)) || 0);
-            const shownQty = Math.max(stored, manualQty);
+            const shownQty = Math.max(owned, manualQty);
             const remain = Math.max(0, need - owned);
             const disabled = need <= 0 && owned <= 0;
             const isOver = manual && need > 0 && shownQty > need;
             item.classList.toggle('is-disabled', disabled);
             item.classList.toggle('has-active', !disabled);
-            item.classList.toggle('is-manual', manual);
+            item.classList.toggle('is-manual', manual && !disabled);
             const amount = ctx.getEl(`material-owned-${id}`);
             if (amount) {
                 const value = disabled ? '-' : String(owned);
@@ -178,7 +224,13 @@ window.NEXUS_MATERIAL = function createMaterialBoard(ctx) {
             });
         }
         ctx.getEl('materialBoardGrid')?.querySelectorAll('.material-board-slot').forEach(slot => {
-            slot.classList.toggle('has-active', !!slot.querySelector('.material-board-item.has-active'));
+            const activeItems = [...slot.querySelectorAll('.material-board-item.has-active')];
+            slot.classList.toggle('has-active', activeItems.length > 0);
+            slot.classList.toggle('is-complete', activeItems.length > 0 && activeItems.every(item => {
+                const atom = ATOM_NAME_BY_ID.get(item.dataset.materialId);
+                const need = Math.max(0, Number(totals.targetMap[atom]) || 0);
+                return need > 0 && (Number(totals.completedMap[atom]) || 0) >= need;
+            }));
         });
         const completeBtn = ctx.getEl('materialBoardCompleteAllBtn');
         if (completeBtn) completeBtn.disabled = ctx.activeUnits.size === 0;
@@ -190,29 +242,82 @@ window.NEXUS_MATERIAL = function createMaterialBoard(ctx) {
         updateModeButtons();
     }
     function invalidate() { rendered = false; }
+    // 핵심재료를 상위 유닛으로 환산한 경우 수량 감소는 같은 원가를 실제 기록에서 차감한다.
+    /* 04. 보유량 입력·환산값 차감 */
+    function removeVirtualParentAmount(parentId, amount) {
+        const recipe = getCoreRecipe(parentId);
+        if (!recipe.length) return;
+        const stock = coreStock();
+        const removable = Math.min(amount, canAssemble(stock, recipe));
+        recipe.forEach(([id, qty]) => {
+            const remaining = (ctx.completedUnits.get(id) || 0) - qty * removable;
+            if (remaining > 0) ctx.completedUnits.set(id, remaining);
+            else ctx.completedUnits.delete(id);
+        });
+    }
+    // 상위 유닛 한 개에서 파생된 핵심재료를 줄일 경우 원가 단위로 풀어 다른 핵심재료를 보존한다.
+    function unpackParentForCore(coreId, amount) {
+        for (const atom of [ctx.VOID_RAY_ATOM, ...ctx.LEGACY_COMPLETION_ATOMS]) {
+            const parentId = ctx.clean(atom), recipe = getCoreRecipe(parentId);
+            if (!recipe.some(([id]) => id === coreId)) continue;
+            while (amount > 0 && (ctx.completedUnits.get(parentId) || 0) > 0) {
+                const ownedParent = ctx.completedUnits.get(parentId);
+                if (ownedParent === 1) ctx.completedUnits.delete(parentId);
+                else ctx.completedUnits.set(parentId, ownedParent - 1);
+                recipe.forEach(([id, qty]) => ctx.completedUnits.set(id, (ctx.completedUnits.get(id) || 0) + qty));
+                const removed = Math.min(amount, ctx.completedUnits.get(coreId) || 0);
+                ctx.completedUnits.set(coreId, ctx.completedUnits.get(coreId) - removed);
+                if (!ctx.completedUnits.get(coreId)) ctx.completedUnits.delete(coreId);
+                amount -= removed;
+            }
+        }
+    }
     function setAmount(id, qty) {
         const atomId = ctx.normalizeSavedId(id);
         if (!ALL_IDS.has(atomId) || (!expanded && !CORE_IDS.has(atomId))) return;
         const atomName = ATOM_NAME_BY_ID.get(atomId);
-        const maximum = Math.max(0, Number(calculateTotals().targetMap[atomName]) || 0);
+        const totals = calculateTotals();
+        const maximum = Math.max(0, Number(totals.targetMap[atomName]) || 0);
         const raw = Math.max(0, parseInt(qty, 10) || 0);
         const next = Math.min(raw, maximum);
-        if (next > 0) ctx.completedUnits.set(atomId, next);
-        else ctx.completedUnits.delete(atomId);
+        const current = Math.min(maximum, Math.max(0, Number(totals.completedMap[atomName]) || 0));
+        const diff = next - current;
+        if (diff > 0) ctx.completedUnits.set(atomId, (ctx.completedUnits.get(atomId) || 0) + diff);
+        else if (diff < 0) {
+            const direct = ctx.completedUnits.get(atomId) || 0;
+            const removed = Math.min(direct, -diff);
+            if (direct > removed) ctx.completedUnits.set(atomId, direct - removed);
+            else ctx.completedUnits.delete(atomId);
+            const remaining = -diff - removed;
+            if (remaining > 0) {
+                if (!RECIPE_CORE_IDS.has(atomId)) removeVirtualParentAmount(atomId, remaining);
+                else unpackParentForCore(atomId, remaining);
+            }
+        }
         if (manual && raw > next && maximum > 0) ctx._materialManualInputs.set(atomId, raw);
         else ctx._materialManualInputs.delete(atomId);
-        // 보유량 입력은 조합 자동 완료를 발생시키지 않는다.
         ctx.commitNexusStateChange();
     }
     function addAmount(id, delta) {
         const atomId = ctx.normalizeSavedId(id);
-        setAmount(atomId, (ctx.completedUnits.get(atomId) || 0) + (parseInt(delta, 10) || 0));
+        const atomName = ATOM_NAME_BY_ID.get(atomId);
+        if (!atomName) return;
+        const current = Math.max(0, calculateTotals().completedMap[atomName] || 0);
+        setAmount(atomId, current + (parseInt(delta, 10) || 0));
     }
+    /* 05. 전체 완료·초기화·입력 모드 전환 */
     function resetAmounts() {
         let changed = false;
         ALL_IDS.forEach(id => { if (ctx.completedUnits.delete(id)) changed = true; });
         if (ctx._materialManualInputs.size) { ctx._materialManualInputs.clear(); changed = true; }
-        // 보유량 초기화는 기존 조합 완료 내역까지 되돌리지 않는다.
+        // 재료 체크 전체 완료로 이동한 목표만 복구하고, 기존 조합 완료는 유지한다.
+        for (const [uid, qty] of ctx._materialCompletedTargets) {
+            if (ctx.completedTargets.get(uid) !== qty) continue;
+            ctx.completedTargets.delete(uid);
+            ctx.setActiveUnitQty(uid, (ctx.activeUnits.get(uid) || 0) + qty);
+            changed = true;
+        }
+        ctx._materialCompletedTargets.clear();
         if (changed) ctx.commitNexusStateChange();
     }
     function completeAll() {
@@ -225,7 +330,9 @@ window.NEXUS_MATERIAL = function createMaterialBoard(ctx) {
             if (qty) ctx.completedUnits.set(ctx.clean(atom), qty);
         }
         for (const [uid, qty] of [...ctx.activeUnits]) {
-            ctx.completedTargets.set(uid, ctx.normalizeUnitQty(uid, qty) || 1);
+            const completedQty = ctx.normalizeUnitQty(uid, qty) || 1;
+            ctx.completedTargets.set(uid, completedQty);
+            ctx._materialCompletedTargets.set(uid, completedQty);
             ctx.activeUnits.delete(uid);
             ctx.pausedUnits.delete(uid);
         }
@@ -234,6 +341,7 @@ window.NEXUS_MATERIAL = function createMaterialBoard(ctx) {
     function toggleInput() { manual = !manual; refresh(); }
     function toggleSlots() {
         expanded = !expanded;
+        ctx.setBuildMaterialMode(expanded);
         invalidate();
         if (ctx._currentViewMode === 'invenboard') {
             render();
