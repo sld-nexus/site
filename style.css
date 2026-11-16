@@ -230,8 +230,10 @@ html.nexus-standalone-build,html.nexus-standalone-build body { height:auto; min-
 .tab-btn:hover { color:var(--ink); }
 .tab-btn.active { color:#ecd397; border-bottom-color:#e6c89e; }
 .tab-btn.has-active::after { content:""; display:inline-block; width:4px; height:4px; background:#e6c89e; border-radius:50%; margin:0 0 5px 4px; }
+.category-count[hidden] { display:none; }
 .collection-tab { display:flex; align-items:center; gap:5px; flex-shrink:0; color:#e7d2b0; }
 .collection-count { display:inline-flex; align-items:center; justify-content:center; min-width:17px; height:17px; padding:0 4px; border-radius:4px; background:#252228; color:#e2c98e; font:9px var(--font-mono); }
+.category-count { margin-left:5px; }
 
 .archive-list-heading { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:6px 0; flex-shrink:0; }
 .archive-list-heading>div:first-child { display:flex; align-items:center; gap:8px; }
@@ -378,11 +380,10 @@ html.nexus-standalone-build,html.nexus-standalone-build body { height:auto; min-
 /* 모바일은 가로 1장 · 세로 2장씩 넘기는 카드 구성 */
 @media (max-width:767px),
        (min-width:768px) and (max-width:950px) and (max-height:520px) and (orientation:landscape) {
-    .unitboard-category-grid,.unitboard-fav-grid { display:grid; grid-template-columns:none; grid-template-rows:repeat(2,auto); grid-auto-flow:column; grid-auto-columns:100%; gap:8px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; scroll-padding-inline:8px; padding:7px 8px 14px; -webkit-overflow-scrolling:touch; }
-    .unitboard-fav-grid { grid-template-rows:repeat(1,auto); }
-    .unitboard-page { display:contents; }
+    .unitboard-category-grid,.unitboard-fav-grid { display:grid; grid-template-columns:none; grid-template-rows:none; grid-auto-flow:column; grid-auto-columns:100%; gap:8px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; scroll-padding-inline:8px; padding:7px 8px 14px; -webkit-overflow-scrolling:touch; }
+    .unitboard-page { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:repeat(2,max-content); gap:8px; min-width:0; scroll-snap-align:start; align-content:start; }
+    .unitboard-fav-page { grid-template-rows:repeat(1,max-content); }
     .unit-card { width:100%; min-width:0; min-height:185px; scroll-snap-align:none; }
-    .unitboard-category-grid .unit-card:nth-child(2n+1),.unitboard-fav-grid .unit-card { scroll-snap-align:start; }
     .uc-card-inner { display:flex; flex-direction:column; height:100%; min-height:0; }
     .uc-head { padding:11px 13px 9px; min-width:0; }
     .uc-meta-row { gap:5px; margin-bottom:6px; flex-wrap:wrap; }

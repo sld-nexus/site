@@ -142,7 +142,6 @@
     /* 내부 안전장치·조작 정책 */
     const APP_INTERNAL = {
         maxLoopQueue: 1000,
-        maxAutoCompletePasses: 64,
         hapticDuration: 15,
         searchFailFeedbackDelay: 1500,
         completeLockDelay: 300,
@@ -1052,6 +1051,14 @@
                 const restoreLevel = _unitRestoreLevels.get(uid) || 0;
                 if (qty > 0 && !activeUnits.has(uid) && restoreLevel > 0 && restoreLevel <= level) ids.add(uid);
             });
+            // 다른 선택 목표의 직속 재료로 완료된 목표도 직속 복구 대상에 포함합니다.
+            if (level >= 4) {
+                const directIds = new Set();
+                activeUnits.forEach((_, uid) => unitMap.get(uid)?.parsedRecipe?.forEach(child => child.id && directIds.add(child.id)));
+                completedTargets.forEach((qty, uid) => {
+                    if (qty > 0 && directIds.has(uid)) ids.add(uid);
+                });
+            }
         }
         return ids;
     }
@@ -1158,6 +1165,11 @@
 
     function resetCompletedMaterialsByLevel(level) {
         getGroupRestoreIds(level).forEach(uid => {
+            if (completedTargets.has(uid)) {
+                const qty = completedTargets.get(uid) || 1;
+                completedTargets.delete(uid);
+                setActiveUnitQty(uid, (activeUnits.get(uid) || 0) + qty);
+            }
             completedUnits.delete(uid);
             _selectionResetRetainedCompleted.delete(uid);
         });
@@ -1294,34 +1306,11 @@
     /* ==========================================================================
        08. 히든 보드
        ========================================================================== */
-    let returnHiddenboardControlsToHeader, renderHiddenboard, switchHiddenboardDetail, placeHiddenboardControls, updateHiddenboard;
+    let completeGroup, returnHiddenboardControlsToHeader, renderHiddenboard, switchHiddenboardDetail, placeHiddenboardControls, updateHiddenboard;
 
     /* ==========================================================================
-       09. 히든보드 자동 완료
+       09. 히든보드 재료 충족 판정
        ========================================================================== */
-
-    function getBoardDependencyDepths(source = activeUnits) {
-        const depths = new Map();
-        const visit = (uid, depth, path = new Set()) => {
-            if (!uid || path.has(uid)) return;
-            if ((depths.get(uid) || -1) < depth) depths.set(uid, depth);
-            const unit = unitMap.get(uid);
-            if (!unit) return;
-            path.add(uid);
-            unit.parsedRecipe?.forEach(child => child.id && visit(child.id, depth + 1, path));
-            getToolNeed(uid).forEach(toolId => visit(toolId, depth + 1, path));
-            path.delete(uid);
-        };
-        (source instanceof Map ? source : activeUnits).forEach((_, uid) => visit(uid, 0));
-        return depths;
-    }
-
-    function addCompletedMaterialUnit(uid, qty) {
-        const amount = Math.max(0, parseInt(qty, 10) || 0);
-        if (amount <= 0) return;
-        completedUnits.set(uid, Math.max(0, completedUnits.get(uid) || 0) + amount);
-    }
-
 
     function getCompletedRecipeReadyQty(uid, maxQty = 1) {
         const unit = unitMap.get(uid);
@@ -1342,12 +1331,11 @@
     }
 
 
-    let completeHiddenboardRecipeUnitsIfReady;
-
     /* ==========================================================================
        10. 유닛 도감·즐겨찾기
        ========================================================================== */
 
+    const UNITBOARD_MOBILE_PAGING = window.matchMedia('(max-width:767px), (min-width:768px) and (max-width:950px) and (max-height:520px) and (orientation:landscape)');
     const UNITBOARD_MIN_GRADE_INDEX = getGradeIndex(SYSTEM_CONFIG.search.minGradeForSearch || "레전드");
     const isUnitboardVisibleException = (id) => CLEAN_UNITBOARD_VISIBLE_EXCEPTION_IDS.has(clean(id));
     const isUnitboardVisibleUnit = (u) => !!u && (getGradeIndex(u.grade) >= UNITBOARD_MIN_GRADE_INDEX || isUnitboardVisibleException(u.id));
@@ -1357,17 +1345,27 @@
         if (!t) return;
         const collections = [['favorites', '즐겨찾기', '☆']];
         t.innerHTML = collections.map(([key, label, icon]) => `<button type="button" id="tab-btn-${key}" role="tab" aria-controls="cat-group-${key}" aria-selected="false" class="tab-btn collection-tab" data-action="showUnitCollection" data-collection="${key}"><span aria-hidden="true">${icon}</span><span>${label}</span><span id="${key}Count" class="collection-count">0</span></button>`).join('') +
-            SYSTEM_CONFIG.tabs.map((c, i) => `<button type="button" id="tab-btn-${i}" role="tab" aria-controls="cat-group-${c.key}" aria-selected="false" class="tab-btn" data-action="selectTab" data-tab-idx="${i}"><span>${c.name}</span></button>`).join('');
+            SYSTEM_CONFIG.tabs.map((c, i) => `<button type="button" id="tab-btn-${i}" role="tab" aria-controls="cat-group-${c.key}" aria-selected="false" class="tab-btn" data-action="selectTab" data-tab-idx="${i}"><span>${c.name}</span><span id="categoryCount-${i}" class="collection-count category-count" hidden>0</span></button>`).join('');
         updateTabsUI();
     }
     function updateTabsUI() {
-        const aCats = new Set([...activeUnits.keys()].map(id => unitMap.get(id)?.category).filter(Boolean));
+        const activeCategoryCounts = new Map();
+        activeUnits.forEach((qty, uid) => {
+            const category = unitMap.get(uid)?.category;
+            if (category && qty > 0) activeCategoryCounts.set(category, (activeCategoryCounts.get(category) || 0) + 1);
+        });
         SYSTEM_CONFIG.tabs.forEach((c, i) => {
             const btn = getEl(`tab-btn-${i}`), isActive = !_unitboardCollection && i === _activeTabIdx;
             if (!btn) return;
             btn.classList.toggle('active', isActive);
             btn.setAttribute('aria-selected', String(isActive));
-            btn.classList.toggle('has-active', aCats.has(c.key));
+            const selectedCount = activeCategoryCounts.get(c.key) || 0;
+            const count = getEl(`categoryCount-${i}`);
+            if (count) {
+                count.hidden = selectedCount === 0;
+                if (count.textContent !== String(selectedCount)) count.textContent = String(selectedCount);
+            }
+            btn.setAttribute('aria-label', selectedCount ? `${c.name} · ${selectedCount}종 선택됨` : c.name);
         });
         ['favorites'].forEach(key => {
             const items = getUnitboardCollectionItems(key), tab = getEl(`tab-btn-${key}`), count = getEl(`${key}Count`);
@@ -1551,7 +1549,7 @@
         if (items.length === 0) {
             return `<div class="collection-empty"><span aria-hidden="true">☆</span><h3>자주 쓰는 유닛을 모아두세요</h3><p>카드의 별을 누르면 여기에 모입니다.<br>원래 도감의 위치와 선택 상태는 그대로 유지됩니다.</p><button type="button" class="ctrl-btn" data-action="selectTab" data-tab-idx="${_activeTabIdx}">유닛도감 둘러보기</button></div>`;
         }
-        return `<p class="collection-guide">모든 분류의 즐겨찾기를 한곳에서 확인하세요. 별을 다시 누르면 해제됩니다.</p><div class="unitboard-fav-grid">${buildPagerPages(items.map(item => buildCard(item, 'fav-')), 2, 'unitboard-page unitboard-fav-page')}</div>`;
+        return `<p class="collection-guide">모든 분류의 즐겨찾기를 한곳에서 확인하세요. 별을 다시 누르면 해제됩니다.</p><div class="unitboard-fav-grid">${buildPagerPages(items.map(item => buildCard(item, 'fav-')), UNITBOARD_MOBILE_PAGING.matches ? 1 : 2, 'unitboard-page unitboard-fav-page')}</div>`;
     }
     function initAllTabContents() {
         const tc = getEl('tabContent');
@@ -1560,6 +1558,11 @@
         tc.innerHTML = groups.map(([key, index]) => `<div id="cat-group-${key}" class="cat-group" role="tabpanel" aria-labelledby="tab-btn-${index}"></div>`).join('');
         _isTabContentInitialized = true;
         _unitboardDomIndexed = false;
+        // 화면 크기 전환 시 카드 묶음 수만 다시 계산하며 선택·저장 상태는 유지합니다.
+        UNITBOARD_MOBILE_PAGING.addEventListener('change', () => {
+            tc.querySelectorAll('.cat-group[data-rendered]').forEach(group => { group.dataset.rendered = ''; });
+            renderCurrentTabContent();
+        });
     }
 
     // Keep already visited tabs; create cards only when that category is opened.
@@ -1576,7 +1579,7 @@
                     items.splice(items.findIndex(unit => unit.id === '데하카고치'), 0, unit);
                 }
             }
-            const body = items.length ? buildPagerPages(items.map(item => buildCard(item)), 6, 'unitboard-page unitboard-category-page') : '<div class="unitboard-empty-msg">표시할 유닛이 없습니다.</div>';
+            const body = items.length ? buildPagerPages(items.map(item => buildCard(item)), UNITBOARD_MOBILE_PAGING.matches ? 2 : 6, 'unitboard-page unitboard-category-page') : '<div class="unitboard-empty-msg">표시할 유닛이 없습니다.</div>';
             group.innerHTML = `<div class="unitboard-category-grid">${body}</div>`;
         }
         group.dataset.rendered = '1';
@@ -1941,34 +1944,16 @@
 
     function updateBoardPanel(calcResult) {
         updateBoardHeader();
-        let autoCompleted = false;
         if (_currentViewMode === 'hiddenboard') {
             if (!_isHiddenboardRendered) renderHiddenboard();
-            if (!_isHiddenboardRendered) return autoCompleted;
-            if (completeHiddenboardRecipeUnitsIfReady()) {
-                calcResult = calculateBoardRequirements();
-                autoCompleted = true;
-            }
+            if (!_isHiddenboardRendered) return;
             updateHiddenboard(calcResult || _lastCalcResult || calculateBoardRequirements());
             updateEmptyMsg();
-            return autoCompleted;
         }
-        return autoCompleted;
-    }
-
-    function refreshPanelsAfterBoardAutoComplete() {
-        const calcResult = calculateBoardRequirements();
-        _lastCalcResult = calcResult;
-        updateCostboard(calculateCostboardAtomTotals());
-        updateTabsUI();
-        updateTabContentUI();
-        updateCartUI();
-        updatePresetBtns();
-        saveNexusState();
     }
 
     function ensureActiveBoardRendered(calcResult) {
-        return updateBoardPanel(calcResult || _lastCalcResult || calculateBoardRequirements());
+        updateBoardPanel(calcResult || _lastCalcResult || calculateBoardRequirements());
     }
 
     function updateEmptyMsg() {
@@ -2052,9 +2037,8 @@
             else btn.removeAttribute('aria-current');
         });
 
-        const autoCompleted = nextMode === 'hiddenboard' ? ensureActiveBoardRendered(_lastCalcResult) : false;
+        if (nextMode === 'hiddenboard') ensureActiveBoardRendered(_lastCalcResult);
         updateBoardHeader();
-        if (autoCompleted) refreshPanelsAfterBoardAutoComplete();
     }
 
     /* ==========================================================================
@@ -2241,6 +2225,7 @@
             case 'restoreUnit': e.stopPropagation(); restoreUnit(uid); break;
             case 'restorePausedUnit': e.stopPropagation(); restorePausedUnit(uid); break;
             case 'resetGroup': e.stopPropagation(); resetGroupCompleted(parseInt(actionEl.dataset.level, 10)); break;
+            case 'completeGroup': e.stopPropagation(); completeGroup(parseInt(actionEl.dataset.level, 10)); break;
             case 'hideRecipeTooltip': e.stopPropagation(); hideRecipeTooltip(); break;
         }
     });
@@ -2332,7 +2317,6 @@
         get _unitboardCollection() { return _unitboardCollection; },
         set _unitboardCollection(value) { _unitboardCollection = value; },
         get activeUnits() { return activeUnits; },
-        get addCompletedMaterialUnit() { return addCompletedMaterialUnit; },
         get calculateBoardRequirements() { return calculateBoardRequirements; },
         get calculateCostboardAtomTotals() { return calculateCostboardAtomTotals; },
         get clean() { return clean; },
@@ -2346,7 +2330,6 @@
         get escapeHtml() { return escapeHtml; },
         get formatConditionText() { return formatConditionText; },
         get formatRecipe() { return formatRecipe; },
-        get getBoardDependencyDepths() { return getBoardDependencyDepths; },
         get getCompletedRecipeReadyQty() { return getCompletedRecipeReadyQty; },
         get getCostboardAtomRawName() { return getCostboardAtomRawName; },
         get getCostboardDisplayName() { return getCostboardDisplayName; },
@@ -2383,7 +2366,7 @@
         get updateBoardHeader() { return updateBoardHeader; },
         get updatePresetBtns() { return updatePresetBtns; }
     };
-    ({ completeHiddenboardRecipeUnitsIfReady, completeUnit, placeHiddenboardControls, renderHiddenboard, resetGroupCompleted, returnHiddenboardControlsToHeader, switchHiddenboardDetail, updateHiddenboard } = window.NEXUS_HIDDEN(boardModuleContext));
+    ({ completeGroup, completeUnit, placeHiddenboardControls, renderHiddenboard, resetGroupCompleted, returnHiddenboardControlsToHeader, switchHiddenboardDetail, updateHiddenboard } = window.NEXUS_HIDDEN(boardModuleContext));
     ({ bindSwipeEvents, updatePivotColumns } = window.NEXUS_RESPONSIVE(boardModuleContext));
 
 

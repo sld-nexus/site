@@ -17,23 +17,56 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         while (cursor) { const next = cursor.nextElementSibling; cursor.remove(); cursor = next; }
     }
 
-    function updateGridPages(grid, items, onlyVisible) {
-        const key = items.map(el => `${el.id}:${onlyVisible && el.style.display === 'none' ? 0 : 1}`).join('|');
+    const HIDDENBOARD_MOBILE_PAGING = window.matchMedia('(max-width:767px), (min-width:768px) and (max-width:950px) and (max-height:520px) and (orientation:landscape)');
+
+    function updateGridPages(grid, items, onlyVisible, groupByGrade) {
+        const isMobileGradeLayout = groupByGrade && HIDDENBOARD_MOBILE_PAGING.matches;
+        const key = `${isMobileGradeLayout ? 'mobile:' : ''}${items.map(el => `${el.id}:${onlyVisible && el.style.display === 'none' ? 0 : 1}`).join('|')}`;
         if (grid._pageKey === key) return;
         const shown = onlyVisible ? items.filter(el => el.style.display !== 'none') : items;
         const hidden = onlyVisible ? items.filter(el => el.style.display === 'none') : [];
-        const pages = Array.from(grid.children).filter(el => el.classList.contains('hiddenboard-page'));
-        const nextPages = [];
-        for (let i = 0; i < shown.length; i += 6) {
-            const page = pages[i / 6] || document.createElement('div');
-            page.className = 'hiddenboard-page';
-            reconcileChildren(page, shown.slice(i, i + 6));
-            nextPages.push(page);
+
+        if (groupByGrade) {
+            const existingGroups = new Map(Array.from(grid.children)
+                .filter(el => el.classList.contains('hiddenboard-grade-group'))
+                .map(el => [el.dataset.grade, el]));
+            const grouped = new Map();
+            for (const item of shown) {
+                const grade = ctx.unitMap.get(item.dataset.uid)?.grade || '';
+                if (!grouped.has(grade)) grouped.set(grade, []);
+                grouped.get(grade).push(item);
+            }
+            const nextGroups = [];
+            const pageSize = isMobileGradeLayout ? 2 : 6;
+            for (const [grade, gradeItems] of grouped) {
+                const group = existingGroups.get(grade) || document.createElement('div');
+                group.className = 'hiddenboard-grade-group';
+                group.dataset.grade = grade;
+                const pages = Array.from(group.children).filter(el => el.classList.contains('hiddenboard-page'));
+                const nextPages = [];
+                for (let i = 0; i < gradeItems.length; i += pageSize) {
+                    const page = pages[i / pageSize] || document.createElement('div');
+                    page.className = 'hiddenboard-page';
+                    reconcileChildren(page, gradeItems.slice(i, i + pageSize));
+                    nextPages.push(page);
+                }
+                reconcileChildren(group, nextPages);
+                nextGroups.push(group);
+            }
+            reconcileChildren(grid, [...hidden, ...nextGroups]);
+        } else {
+            const pages = Array.from(grid.children).filter(el => el.classList.contains('hiddenboard-page'));
+            const nextPages = [];
+            for (let i = 0; i < shown.length; i += 6) {
+                const page = pages[i / 6] || document.createElement('div');
+                page.className = 'hiddenboard-page';
+                reconcileChildren(page, shown.slice(i, i + 6));
+                nextPages.push(page);
+            }
+            reconcileChildren(grid, [...hidden, ...nextPages]);
         }
-        reconcileChildren(grid, [...hidden, ...nextPages]);
         grid._pageKey = key;
     }
-
 
     /* ── 02 · 보드 생성·작업 버튼 배치 ── */
 
@@ -46,9 +79,9 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
             const unit = ctx.unitMap.get(id);
             const essenceText = ctx.getUnitUnitboardEssenceText(unit);
             const noticeHtml = ctx.getUnitCardNotesHtml(unit);
-            return `<div class="hiddenboard-slot" id="d-slot-wrap-${id}" data-uid="${id}" data-detail-view="usage"><div class="d-slot-main"><div class="d-name"><div class="d-grade-row"><div class="d-grade-left"><span class="gtag grade-${g}">${g}</span></div><button type="button" class="d-target-badge" data-action="toggleHighlight" data-uid="${id}" aria-pressed="false" hidden>조합추적</button></div><div class="d-name-line"><span class="d-name-inline">${n}${ctx.CLEAN_SPECIAL_CONDITIONS[id]?`<span class="badge-special-cond recipe-cond-offset">특수조건</span>`:''}</span></div>${noticeHtml}${essenceText}</div></div><div id="d-cond-${id}" class="d-cond-inline"></div><div class="d-detail-wrap"><div class="d-detail-toolbar"><div class="d-detail-tabs" role="group" aria-label="${n} 표시 정보"><button type="button" class="d-detail-tab is-active" data-action="switchHiddenboardDetail" data-uid="${id}" data-detail-view="usage" aria-pressed="true" aria-controls="d-reason-${id}">상위조합</button><button type="button" class="d-detail-tab" data-action="switchHiddenboardDetail" data-uid="${id}" data-detail-view="recipe" aria-pressed="false" aria-controls="d-recipe-${id}">조합법</button></div><span class="d-detail-meta d-usage-hint" title="상위조합의 유닛명을 선택하면 해당 조합을 추적합니다">선택 시 추적 ↗</span><span class="d-detail-meta d-recipe-meta"></span></div><div class="d-detail-panels"><div class="d-reason-wrap" id="d-reason-${id}" aria-hidden="false"></div><div class="d-recipe-wrap" id="d-recipe-${id}" aria-hidden="true" inert></div></div></div><div class="d-goal-recipe-wrap" id="d-goal-recipe-${id}"></div><div id="craft-wrap-${id}" class="craft-wrap"></div></div>`;
+            return `<div class="hiddenboard-slot" id="d-slot-wrap-${id}" data-uid="${id}" data-detail-view="usage"><div class="d-slot-main"><div class="d-name"><div class="d-grade-row"><div class="d-grade-left"><span class="gtag grade-${g}">${g}</span></div><div class="d-grade-actions"><button type="button" class="d-target-badge" data-action="toggleHighlight" data-uid="${id}" aria-pressed="false" hidden>조합추적</button><span class="d-material-ready" hidden><span class="d-material-ready-star" aria-hidden="true">✦</span>완료 준비됨</span></div></div><div class="d-name-line"><span class="d-name-inline">${n}${ctx.CLEAN_SPECIAL_CONDITIONS[id]?`<span class="badge-special-cond recipe-cond-offset">특수조건</span>`:''}</span></div>${noticeHtml}${essenceText}</div></div><div id="d-cond-${id}" class="d-cond-inline"></div><div class="d-detail-wrap"><div class="d-detail-toolbar"><div class="d-detail-tabs" role="group" aria-label="${n} 표시 정보"><button type="button" class="d-detail-tab is-active" data-action="switchHiddenboardDetail" data-uid="${id}" data-detail-view="usage" aria-pressed="true" aria-controls="d-reason-${id}">상위조합</button><button type="button" class="d-detail-tab" data-action="switchHiddenboardDetail" data-uid="${id}" data-detail-view="recipe" aria-pressed="false" aria-controls="d-recipe-${id}">조합법</button></div><span class="d-detail-meta d-usage-hint" title="상위조합의 유닛명을 선택하면 해당 조합을 추적합니다">선택 시 추적 ↗</span><span class="d-detail-meta d-recipe-meta"></span></div><div class="d-detail-panels"><div class="d-reason-wrap" id="d-reason-${id}" aria-hidden="false"></div><div class="d-recipe-wrap" id="d-recipe-${id}" aria-hidden="true" inert></div></div></div><div class="d-goal-recipe-wrap" id="d-goal-recipe-${id}"></div><div id="craft-wrap-${id}" class="craft-wrap"></div></div>`;
         };
-        const getGrp = (id, pid, title, resetLevel=0, isCol=false, alwaysShow=false, alwaysOpen=false, resetLabel='완료복구') => `
+        const getGrp = (id, pid, title, resetLevel, isCol, alwaysShow, alwaysOpen, resetLabel) => `
             <div class="hiddenboard-group" id="${id}" style="${alwaysShow ? '' : 'display:none;'}" ${alwaysShow ? 'data-always-show="true"' : ''} ${alwaysOpen ? 'data-always-open="true"' : ''}>
                 <div class="hiddenboard-group-title" data-action="toggleGroup" data-grid-id="${pid}">
                     <div class="grp-title-main">
@@ -57,7 +90,7 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
                         ${resetLevel > 0 ? `<span class="grp-count-badge" id="grp-count-${pid}"></span>` : ''}
                     </div>
                     <div class="grp-title-actions" id="${id}-actions">
-                        ${resetLevel > 0 ? `<button type="button" class="btn-text-link" data-action="resetGroup" data-level="${resetLevel}" title="${getGroupRestoreDescription(resetLevel)}" disabled><span>${resetLabel}</span><span class="action-icon" aria-hidden="true">↺</span></button>` : ''}
+                        ${resetLevel > 0 ? `<button type="button" class="btn-text-link" data-action="completeGroup" data-level="${resetLevel}" title="${getGroupCompleteDescription(resetLevel)}" disabled><span class="group-complete-label">${resetLabel.replace(/복구$/, '완료')}</span><span class="action-icon" aria-hidden="true">✓</span></button><button type="button" class="btn-text-link" data-action="resetGroup" data-level="${resetLevel}" title="${getGroupRestoreDescription(resetLevel)}" disabled><span>${resetLabel}</span><span class="action-icon" aria-hidden="true">↺</span></button>` : ''}
                     </div>
                 </div>
                 <div class="hiddenboard-grid" id="${pid}" ${isCol?'style="display:none;"':''}></div>
@@ -74,33 +107,33 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         ctx._hiddenboardSlotElsByUid.clear();
         boardEl.querySelectorAll('.hiddenboard-slot[data-uid]').forEach(el => ctx._hiddenboardSlotElsByUid.set(el.dataset.uid, el));
         ctx._isHiddenboardRendered = true;
+        // 모바일 2장 묶음과 태블릿 6장 묶음 간 전환 시 기본 재료의 등급별 페이지를 다시 배치합니다.
+        HIDDENBOARD_MOBILE_PAGING.addEventListener('change', () => updateHiddenboard(ctx._lastCalcResult || ctx.calculateBoardRequirements()));
         placeHiddenboardControls();
     }
 
+    function mountHiddenboardControls(actions, host, inGroup) {
+        if (actions.parentElement !== host) {
+            if (inGroup) host.insertBefore(actions, host.firstChild);
+            else host.appendChild(actions);
+        }
+        actions.classList.toggle('hiddenboard-actions-in-group', inGroup);
+        actions.classList.toggle('hiddenboard-actions-in-header', !inGroup);
+    }
+
     function returnHiddenboardControlsToHeader() {
-        const actions = ctx.getEl('hiddenboardGlobalActions') || document.querySelector('.hiddenboard-ph-btns');
-        const mobileHost = ctx.getEl('boardMobileHeader');
-        if (!actions || !mobileHost) return;
-        if (actions.parentElement !== mobileHost) mobileHost.appendChild(actions);
-        actions.classList.remove('hiddenboard-actions-in-group');
-        actions.classList.add('hiddenboard-actions-in-header');
+        const actions = ctx.getEl('hiddenboardGlobalActions');
+        const header = ctx.getEl('boardMobileHeader');
+        if (actions && header) mountHiddenboardControls(actions, header, false);
     }
 
     function placeHiddenboardControls() {
-        const actions = ctx.getEl('hiddenboardGlobalActions') || document.querySelector('.hiddenboard-ph-btns');
-        const mobileHost = ctx.getEl('boardMobileHeader');
+        const actions = ctx.getEl('hiddenboardGlobalActions');
+        const header = ctx.getEl('boardMobileHeader');
         const desktopHost = ctx.getEl('group-target-actions');
-        if (!actions || !mobileHost) return;
-        const useMobileHeader = window.matchMedia('(max-width: 767px)').matches || !desktopHost;
-        if (useMobileHeader) {
-            if (actions.parentElement !== mobileHost) mobileHost.appendChild(actions);
-            actions.classList.remove('hiddenboard-actions-in-group');
-            actions.classList.add('hiddenboard-actions-in-header');
-        } else {
-            if (actions.parentElement !== desktopHost) desktopHost.insertBefore(actions, desktopHost.firstChild);
-            actions.classList.remove('hiddenboard-actions-in-header');
-            actions.classList.add('hiddenboard-actions-in-group');
-        }
+        if (!actions || !header) return;
+        const inGroup = !HIDDENBOARD_MOBILE_PAGING.matches && !!desktopHost;
+        mountHiddenboardControls(actions, inGroup ? desktopHost : header, inGroup);
     }
 
 
@@ -335,7 +368,7 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
                        (ctx.SYSTEM_CONFIG.sorting.order[uB?.name]||0) - (ctx.SYSTEM_CONFIG.sorting.order[uA?.name]||0) ||
                        (uA?.name || uidA).localeCompare(uB?.name || uidB);
             });
-            updateGridPages(grid, children, onlyVisible);
+            updateGridPages(grid, children, onlyVisible, grid === grids.basicHidden);
         });
     }
 
@@ -494,6 +527,11 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
 
             const isFinalGoal = tGrid === grids.target;
             slotEl.classList.toggle('is-final-goal', isFinalGoal);
+            slotEl.classList.toggle('is-direct-material', tGrid === grids.special);
+            const readyLabel = slotEl.querySelector('.d-material-ready');
+            const isMaterialReady = !isCompleted && ctx.getCompletedRecipeReadyQty(id, needed) >= 1;
+            slotEl.classList.toggle('is-material-ready', isMaterialReady);
+            if (readyLabel) readyLabel.hidden = !isMaterialReady;
             const targetButton = slotEl.querySelector('.d-target-badge');
             if (targetButton) {
                 const canTrack = isFinalGoal || tGrid === grids.special;
@@ -510,8 +548,9 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
             const cWrap = slotEl.querySelector(`#craft-wrap-${id}`);
             if (cWrap) {
                 if (!isCompleted) {
+                    const oneDisabled = needed === 1 ? ' disabled' : '';
                     const tenDisabled = needed >= 10 ? '' : ' disabled';
-                    const qtyButtons = isFinalGoal ? '' : `<button type="button" class="pc-btn" data-action="addComplete" data-uid="${id}" data-batch="1"><span class="batch-plus" aria-hidden="true">+</span>1개</button><button type="button" class="pc-btn" data-action="addComplete" data-uid="${id}" data-batch="10"${tenDisabled}><span class="batch-plus" aria-hidden="true">+</span>10개</button>`;
+                    const qtyButtons = isFinalGoal ? '' : `<button type="button" class="pc-btn" data-action="addComplete" data-uid="${id}" data-batch="1"${oneDisabled}><span class="batch-plus" aria-hidden="true">+</span>1개</button><button type="button" class="pc-btn" data-action="addComplete" data-uid="${id}" data-batch="10"${tenDisabled}><span class="batch-plus" aria-hidden="true">+</span>10개</button>`;
                     setHTMLIfChanged(cWrap, `<div class="craft-wrap-left"><span class="req-text">${needed}</span><span class="req-label">개</span></div><div class="craft-wrap-right">${qtyButtons}<button type="button" class="btn-complete" data-action="completeUnit" data-uid="${id}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m5 12 4 4 10-10"/></svg>완료</button></div>`);
                 } else setHTMLIfChanged(cWrap, `<div class="craft-wrap-left"><span class="req-text">0</span><span class="req-label">개</span></div><div class="craft-wrap-right"><span class="complete-done-label">완료됨</span></div>`);
             }
@@ -549,7 +588,9 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         ctx._hiddenboardSlotElsByUid.forEach(el => {
             if (usedSlots.has(el)) return;
             if (el.style.display !== 'none') el.style.display = 'none';
-            el.classList.remove('is-visible', 'has-target', 'is-completed', 'highlighted-tree');
+            el.classList.remove('is-visible', 'has-target', 'is-completed', 'is-direct-material', 'highlighted-tree', 'is-material-ready');
+            const readyLabel = el.querySelector('.d-material-ready');
+            if (readyLabel) readyLabel.hidden = true;
             if (pool && el.parentElement !== pool) pool.appendChild(el);
         });
         sortHiddenboardGrids(grids, slotsByGrid, !!targetHighlight);
@@ -561,81 +602,60 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         ctx._hiddenboardSlotElsByUid.forEach((el, cleanId) => {
             el.classList.toggle('highlighted-tree', !!ctx._currentHighlight && highlightDeps?.has(cleanId));
         });
-        updateGroupRestoreButtons();
+        updateGroupActionButtons();
         if (board && board.scrollTop !== scrollTop) board.scrollTop = scrollTop;
     }
 
 
     /* ── 06 · 완료 후보·처리·복구 ── */
 
-    function getHiddenboardRecipeCompletionCandidates(baseMap) {
-        const depths = ctx.getBoardDependencyDepths();
-        const candidates = new Map();
-
-        const addCandidate = (uid, qty) => {
-            const requiredQty = Math.max(0, parseInt(qty, 10) || 0);
-            if (requiredQty <= 0 || !ctx.unitMap.has(uid) || ctx.completedTargets.has(uid)) return;
-            const depth = depths.has(uid) ? depths.get(uid) : (ctx.activeUnits.has(uid) ? 0 : -1);
-            if (depth < 0) return;
-            candidates.set(uid, { unit: ctx.unitMap.get(uid), qty: requiredQty, depth });
-        };
-
-        baseMap.forEach((qty, uid) => addCandidate(uid, qty));
-        ctx.activeUnits.forEach((qty, uid) => addCandidate(uid, qty));
-
-        return [...candidates.values()].sort((a, b) =>
-            b.depth - a.depth ||
-            ctx.getGradeIndex(a.unit.grade) - ctx.getGradeIndex(b.unit.grade) ||
-            a.unit.name.localeCompare(b.unit.name)
-        );
+    function getUnitCompletionState(uid, calcResult) {
+        const { reqMap, baseMap, autoCostReq } = calcResult;
+        const isTarget = ctx.activeUnits.has(uid);
+        const isAutoCost = ctx.AUTO_COST_SLOT_SET.has(uid);
+        let isMergedSlot = false;
+        if (isTarget && !isAutoCost) {
+            ctx.activeUnits.forEach((_, activeId) => {
+                if (activeId !== uid && ctx.unitMap.get(activeId)?.parsedRecipe?.some(pr => pr.id === uid)) isMergedSlot = true;
+            });
+        }
+        const isPureTarget = isTarget && !isMergedSlot && !isAutoCost;
+        const remaining = isPureTarget
+            ? Math.max(0, (ctx.activeUnits.get(uid) || 1) - (ctx.completedUnits.get(uid) || 0))
+            : isAutoCost ? autoCostReq[uid] || 0
+            : isTarget && isMergedSlot ? Math.max(0, (baseMap.get(uid) || 1) - (ctx.completedUnits.get(uid) || 0))
+            : reqMap.get(uid) || 0;
+        return { remaining, baseMap, isPureTarget, isTarget, isMergedSlot };
     }
 
-    function completeHiddenboardRecipeUnitsIfReady() {
-        if (ctx._currentViewMode !== 'hiddenboard' || ctx.activeUnits.size === 0) return false;
+    // 개별 완료와 일괄 완료가 같은 수량 소비·목표 이동 규칙을 사용합니다.
+    function applyCompletedUnit(uid, amount, calcResult) {
+        const { remaining, baseMap, isPureTarget, isTarget, isMergedSlot } = getUnitCompletionState(uid, calcResult);
+        const requestedQty = amount === undefined ? remaining : parseInt(amount, 10);
+        const processQty = requestedQty === 10 && remaining < 10 ? 0 : Math.min(requestedQty, remaining);
+        if (!(processQty > 0)) return 0;
 
-        let changed = false;
-        for (let pass = 0; pass < ctx.APP_INTERNAL.maxAutoCompletePasses && ctx.activeUnits.size > 0; pass++) {
-            const activeSizeBefore = ctx.activeUnits.size;
-            const { baseMap } = ctx.calculateBoardRequirements();
-            const candidates = getHiddenboardRecipeCompletionCandidates(baseMap);
-            let completedThisPass = false;
+        const prevCompleted = ctx.completedUnits.get(uid) || 0;
+        ctx.deleteCompletedRecipe(uid, processQty);
+        const newComp = Math.max(prevCompleted, ctx.completedUnits.get(uid) || 0) + processQty;
+        ctx.completedUnits.set(uid, newComp);
 
-            for (const { unit, qty: requiredQty } of candidates) {
-                const uid = unit.id;
-                const currentCompleted = Math.max(0, parseInt(ctx.completedUnits.get(uid), 10) || 0);
-                const targetQty = ctx.activeUnits.has(uid) ? (ctx.activeUnits.get(uid) || 1) : requiredQty;
-                const remainingQty = Math.max(0, targetQty - currentCompleted);
-                if (remainingQty <= 0) continue;
-
-                const readyQty = ctx.getCompletedRecipeReadyQty(uid, remainingQty);
-                if (readyQty <= 0) continue;
-
-                ctx.deleteCompletedRecipe(uid, readyQty);
-                if (ctx.activeUnits.has(uid)) {
-                    const activeQty = ctx.activeUnits.get(uid) || 1;
-                    const nextCompleted = currentCompleted + readyQty;
-                    if (nextCompleted >= activeQty) {
-                        ctx.completedTargets.set(uid, activeQty);
-                        ctx.activeUnits.delete(uid);
-                        ctx.pausedUnits.delete(uid);
-                        ctx.completedUnits.delete(uid);
-                                    } else {
-                        ctx.completedUnits.set(uid, nextCompleted);
-                    }
-                } else {
-                    ctx.addCompletedMaterialUnit(uid, readyQty);
-                }
-
-                completedThisPass = changed = true;
-                if (ctx.activeUnits.size !== activeSizeBefore) break;
+        if (isPureTarget && newComp >= (ctx.activeUnits.get(uid) || 1)) {
+            ctx.completedTargets.set(uid, ctx.activeUnits.get(uid) || 1);
+            ctx.activeUnits.delete(uid);
+            ctx.completedUnits.delete(uid);
+        } else if (isTarget && isMergedSlot) {
+            const totalQty = baseMap.get(uid) || 1;
+            if (newComp >= totalQty) {
+                const activeQty = ctx.activeUnits.get(uid) || 1;
+                const matQty = totalQty - activeQty;
+                ctx.completedTargets.set(uid, activeQty);
+                ctx.activeUnits.delete(uid);
+                if (matQty > 0) ctx.completedUnits.set(uid, matQty);
+                else ctx.completedUnits.delete(uid);
             }
-
-            if (!completedThisPass || ctx.activeUnits.size === activeSizeBefore) break;
         }
-
-        if (!changed) return false;
-        ctx._currentHighlight = null;
-        return true;
+        return processQty;
     }
 
     function completeUnit(uid, amount) {
@@ -647,52 +667,9 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         const restoreBtns = () => enabledBtns.forEach(b => { if (b.isConnected) b.disabled = false; });
         lockBtns.forEach(b => b.disabled = true);
         try {
-            const { reqMap, baseMap, autoCostReq } = ctx.calculateBoardRequirements();
-            const isTarget = ctx.activeUnits.has(uid);
-            const isAutoCost = ctx.AUTO_COST_SLOT_SET.has(uid);
-            let isMergedSlot = false;
-            if (isTarget && !isAutoCost) {
-                ctx.activeUnits.forEach((_, activeId) => {
-                    if (activeId !== uid && ctx.unitMap.get(activeId)?.parsedRecipe?.some(pr => pr.id === uid)) isMergedSlot = true;
-                });
-            }
-            const isPureTarget = isTarget && !isMergedSlot && !isAutoCost;
-            let reqVal = 0;
-            if (isPureTarget) reqVal = Math.max(0, (ctx.activeUnits.get(uid) || 1) - (ctx.completedUnits.get(uid) || 0));
-            else if (isAutoCost) reqVal = autoCostReq[uid] || 0;
-            else if (isTarget && isMergedSlot) reqVal = Math.max(0, (baseMap.get(uid) || 1) - (ctx.completedUnits.get(uid) || 0));
-            else reqVal = reqMap.get(uid) || 0;
-
-            const requestedQty = amount !== undefined ? parseInt(amount, 10) : reqVal;
-            const processQty = requestedQty === 10 && reqVal < 10 ? 0 : Math.min(requestedQty, reqVal);
-            if (processQty > 0) {
-                const prevCompleted = ctx.completedUnits.get(uid) || 0;
-                ctx.deleteCompletedRecipe(uid, processQty);
-                const newComp = Math.max(prevCompleted, ctx.completedUnits.get(uid) || 0) + processQty;
-                ctx.completedUnits.set(uid, newComp);
-
-                if (isPureTarget) {
-                    if (newComp >= (ctx.activeUnits.get(uid) || 1)) {
-                        ctx.completedTargets.set(uid, ctx.activeUnits.get(uid) || 1);
-                        ctx.activeUnits.delete(uid);
-                        ctx.completedUnits.delete(uid);
-                    }
-                } else if (isTarget && isMergedSlot) {
-                    const totalQty = baseMap.get(uid) || 1;
-                    if (newComp >= totalQty) {
-                        const activeQty = ctx.activeUnits.get(uid) || 1;
-                        const matQty = totalQty - activeQty;
-                        ctx.completedTargets.set(uid, activeQty);
-                        ctx.activeUnits.delete(uid);
-                        if (matQty > 0) ctx.completedUnits.set(uid, matQty);
-                        else ctx.completedUnits.delete(uid);
-                    }
-                }
-                completeHiddenboardRecipeUnitsIfReady();
-                ctx.commitNexusStateChange({ clearHighlight: true });
-            } else {
-                restoreBtns();
-            }
+            const processQty = applyCompletedUnit(uid, amount, ctx.calculateBoardRequirements());
+            if (processQty > 0) ctx.commitNexusStateChange({ clearHighlight: true });
+            else restoreBtns();
         } catch {
             restoreBtns();
         } finally {
@@ -703,7 +680,66 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         }
     }
 
+    // 해당 단계와 하위 단계만 선택합니다. 상위 유닛부터 처리하고 매 단계
+    // 필요량을 재계산하여 재료 소비 후 아래 단계가 미완료로 남지 않게 합니다.
+    function getGroupCompletionIds(level) {
+        return [...ctx._unitRestoreLevels]
+            .filter(([uid, groupLevel]) => groupLevel > 0 && groupLevel <= level && ctx.unitMap.has(uid))
+            .map(([uid]) => uid)
+            .sort((a, b) => {
+                const diff = (ctx._unitRestoreLevels.get(b) || 0) - (ctx._unitRestoreLevels.get(a) || 0);
+                if (diff) return diff;
+                if (ctx.getDependencies(a).has(b)) return -1;
+                if (ctx.getDependencies(b).has(a)) return 1;
+                return ctx.compareUnitByHiddenboardPriority(ctx.unitMap.get(a), ctx.unitMap.get(b));
+            });
+    }
+
+    const getGroupCompleteLabel = (level) =>
+        ctx.GROUP_DEFS.find(g => g.resetLevel === level)?.resetLabel.replace(/복구$/, '완료') || '일괄 완료';
+
+    let pendingGroupComplete = null;
+    function clearGroupCompleteConfirmation() {
+        if (!pendingGroupComplete) return;
+        clearTimeout(pendingGroupComplete.timer);
+        const btn = document.querySelector(`.grp-title-actions [data-action="completeGroup"][data-level="${pendingGroupComplete.level}"]`);
+        btn?.classList.remove('group-complete-pending');
+        if (btn) {
+            const label = getGroupCompleteLabel(pendingGroupComplete.level);
+            const text = btn.querySelector('.group-complete-label');
+            if (text && label) text.textContent = label;
+            btn.title = getGroupCompleteDescription(pendingGroupComplete.level);
+        }
+        pendingGroupComplete = null;
+    }
+
+    function completeGroup(level) {
+        const btn = document.querySelector(`.grp-title-actions [data-action="completeGroup"][data-level="${level}"]`);
+        if (!btn || btn.disabled) return;
+        const signature = JSON.stringify([[...ctx.activeUnits], [...ctx.completedUnits], [...ctx.completedTargets]]);
+        if (!pendingGroupComplete || pendingGroupComplete.level !== level || pendingGroupComplete.signature !== signature) {
+            clearGroupCompleteConfirmation();
+            const label = btn.querySelector('.group-complete-label');
+            if (label) label.textContent = '완료 확인';
+            btn.classList.add('group-complete-pending');
+            btn.title = '한 번 더 누르면 해당 단계와 모든 하위 재료를 일괄 완료합니다 (4초 내)';
+            pendingGroupComplete = { level, signature, timer: setTimeout(clearGroupCompleteConfirmation, 4000) };
+            return;
+        }
+        clearGroupCompleteConfirmation();
+        let count = 0;
+        for (const uid of getGroupCompletionIds(level)) {
+            if (applyCompletedUnit(uid, undefined, ctx.calculateBoardRequirements()) > 0) count++;
+        }
+        if (count > 0) {
+            const label = getGroupCompleteLabel(level);
+            ctx.showActionFeedback(`${label} · ${count}종 완료됨 ✓`);
+            ctx.commitNexusStateChange({ clearHighlight: true });
+        }
+    }
+
     function resetGroupCompleted(level) {
+        clearGroupCompleteConfirmation();
         const ids = ctx.getGroupRestoreIds(level);
         if (ids.size === 0) return;
         if (level >= 5) {
@@ -730,18 +766,37 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         return '기본 재료의 완료 상태만 복구합니다. 목표와 보류 목록은 유지합니다.';
     }
 
-    function updateGroupRestoreButtons() {
-        document.querySelectorAll('.grp-title-actions [data-action="resetGroup"]').forEach(btn => {
-            const level = parseInt(btn.dataset.level, 10), count = ctx.getGroupRestoreIds(level).size;
-            const description = getGroupRestoreDescription(level);
-            btn.disabled = count === 0;
-            btn.title = `${description} · ${count > 0 ? `복구 대상 ${count}종` : '복구할 항목 없음'}`;
+    function getGroupCompleteDescription(level) {
+        if (level >= 5) return '최종 목표와 직속·히든·기본 재료를 일괄 완료합니다. 확인을 위해 두 번 누릅니다.';
+        if (level >= 4) return '직속·히든·기본 재료를 일괄 완료합니다. 직속 재료를 겸하는 선택 목표도 포함됩니다. 확인을 위해 두 번 누릅니다.';
+        if (level >= 3) return '히든·기본 재료를 일괄 완료합니다. 최종·직속 재료는 유지합니다. 확인을 위해 두 번 누릅니다.';
+        return '기본 재료만 일괄 완료합니다. 상위 조합은 유지합니다. 확인을 위해 두 번 누릅니다.';
+    }
+
+    function updateGroupActionButtons() {
+        const calcResult = ctx.calculateBoardRequirements();
+        const outstanding = [...ctx._unitRestoreLevels].filter(([uid, groupLevel]) =>
+            groupLevel > 0 && ctx.unitMap.has(uid) && getUnitCompletionState(uid, calcResult).remaining > 0
+        ).map(([, groupLevel]) => groupLevel);
+        document.querySelectorAll('.grp-title-actions [data-level]').forEach(btn => {
+            const level = parseInt(btn.dataset.level, 10);
+            if (btn.dataset.action === 'resetGroup') {
+                const count = ctx.getGroupRestoreIds(level).size;
+                btn.disabled = count === 0;
+                btn.title = `${getGroupRestoreDescription(level)} · ${count > 0 ? `복구 대상 ${count}종` : '복구할 항목 없음'}`;
+            } else if (btn.dataset.action === 'completeGroup') {
+                const count = outstanding.filter(groupLevel => groupLevel <= level).length;
+                btn.disabled = count === 0;
+                if (!pendingGroupComplete || pendingGroupComplete.level !== level) {
+                    btn.title = `${getGroupCompleteDescription(level)} · ${count > 0 ? `완료 대상 ${count}종` : '완료할 항목 없음'}`;
+                }
+            }
         });
     }
 
 
     /* ── 공개 API ── */
 
-    return { completeHiddenboardRecipeUnitsIfReady, completeUnit, placeHiddenboardControls, renderHiddenboard, resetGroupCompleted, returnHiddenboardControlsToHeader, switchHiddenboardDetail, updateHiddenboard };
+    return { completeGroup, completeUnit, placeHiddenboardControls, renderHiddenboard, resetGroupCompleted, returnHiddenboardControlsToHeader, switchHiddenboardDetail, updateHiddenboard };
 
 };

@@ -10,7 +10,7 @@
 .grp-title-main { display:flex; align-items:center; gap:7px; font-size:calc(14px * var(--fs-scale)); }
 .grp-toggle-icon { font-size:7px; color:#bfc5d1; transition:transform .18s; }
 .grp-count-badge { padding:3px 7px; border:1px solid #ffffff24; border-radius:6px; font:10px var(--font-mono); background:#101115; color:#e4e9f0; }
-.grp-title-actions { display:flex; align-items:center; gap:25px; }
+.grp-title-actions { display:flex; align-items:center; gap:12px; }
 .btn-text-link { border:0; background:transparent; color:#bfc5d1; padding:5px 0; font-size:9px; }
 .btn-text-link:hover { color:#bfc5d1; }
 .ctrl-btn { min-height:29px; padding:5px 9px; border:1px solid #666371; background:#1d1d22; color:#e7d2b0; border-radius:6px; font-size:9px; }
@@ -25,6 +25,9 @@
 }
 .hiddenboard-ph-btns .ctrl-btn:hover:not(:disabled),
 .grp-title-actions > .btn-text-link:hover:not(:disabled) { color:var(--g); background:#efd3a409; }
+.grp-title-actions > .group-complete-pending { color:#efbe98; }
+.grp-title-actions > .group-complete-pending .group-complete-label { text-decoration:underline; text-underline-offset:3px; }
+.grp-title-actions > .btn-text-link:disabled { opacity:.38; cursor:default; }
 @media (min-width:1025px) and (min-aspect-ratio:11/10) and (hover:hover) and (pointer:fine) {
     .hiddenboard-ph-btns .ctrl-btn,.grp-title-actions > .btn-text-link { font-size:calc(13px * var(--fs-scale)); }
     .d-detail-tab { font-size:calc(12px * var(--fs-scale)); }
@@ -48,12 +51,27 @@
     background:currentColor; transform-origin:left; animation:reset-wait 2s linear forwards; }
 .hiddenboard-ph-btns .reset-btn-done:disabled { opacity:1; color:#a4d6bc; }
 @keyframes reset-wait { from { transform:scaleX(1); } to { transform:scaleX(0); } }
-.hiddenboard-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding-top:14px; align-items:stretch; }
+.hiddenboard-grid { --hb-grade-columns:3; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding-top:14px; align-items:stretch; }
+/* 기본 재료에만 등급별 보이지 않는 행 경계를 적용합니다. */
+#grid-basic-hidden .hiddenboard-grade-group { display:grid; grid-column:1 / -1; grid-template-columns:repeat(var(--hb-grade-columns),minmax(0,1fr)); gap:12px; align-items:stretch; min-width:0; }
+@supports (grid-template-columns:subgrid) {
+    #grid-basic-hidden .hiddenboard-grade-group { grid-template-columns:subgrid; }
+}
 .hiddenboard-page { display:contents; }
 .hiddenboard-slot { display:none; flex-direction:column; position:relative; min-width:0; overflow:hidden; min-height:0; transition:opacity .2s,filter .2s,background .18s,border-color .2s,box-shadow .18s; }
 .hiddenboard-slot.is-final-goal { min-height:0; }
 .hiddenboard-slot.is-visible { display:flex; }
 .hiddenboard-slot.has-target { background:var(--card-surface); }
+.hiddenboard-slot.is-material-ready:not(.is-completed) {
+    border-color:var(--card-tone,var(--accent));
+    background:linear-gradient(125deg,#ab7a2d20,#d7a34810 60%,#f5ca781a),var(--card-surface);
+    box-shadow:0 0 0 1px #e9bc6a80,0 0 16px #d5a64b40,inset 0 0 18px #d5a64b20;
+    animation:hiddenboard-ready-bloom 1.2s ease-out 1;
+}
+@keyframes hiddenboard-ready-bloom {
+    from { box-shadow:0 0 0 2px #f6d594bb,0 0 30px #f4c76c80,inset 0 0 26px #d5a64b3b; }
+    to { box-shadow:0 0 0 1px #e9bc6a80,0 0 16px #d5a64b40,inset 0 0 18px #d5a64b20; }
+}
 .hiddenboard-slot-pool { display:none; }
 /* 재료 상위조합·조합법 표시 */
 .d-detail-wrap { flex:1; min-height:0; border-top:1px solid var(--line); background:#151619; }
@@ -107,6 +125,12 @@
 .hiddenboard-slot.is-final-goal .d-slot-main { padding-bottom:10px; }
 .d-grade-row { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; width:100%; max-width:100%; }
 .d-grade-left { display:flex; align-items:center; flex-wrap:wrap; gap:7px; min-width:0; }
+.d-grade-actions { display:flex; align-items:flex-end; justify-content:flex-end; gap:5px; margin-left:auto; min-width:0; }
+.hiddenboard-slot:is(.is-direct-material,.is-final-goal) .d-grade-actions { flex-direction:column; }
+.d-material-ready { flex-shrink:0; font-size:calc(11px * var(--fs-scale)); font-weight:850; letter-spacing:.025em; line-height:1.5; white-space:nowrap; color:#f4c762; background:linear-gradient(110deg,#a46b1e 0%,#f5c45c 30%,#fff4bd 47%,#ffd47d 60%,#a46b1e 100%); background-size:230% 100%; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; filter:drop-shadow(0 0 3px #f8ca754d); animation:hiddenboard-ready-shine 3.8s ease-in-out infinite; }
+.d-material-ready[hidden] { display:none; }
+.d-material-ready-star { margin-right:3px; }
+@keyframes hiddenboard-ready-shine { 0%,22% { background-position:100% 50%; } 55%,100% { background-position:0% 50%; } }
 .d-target-badge { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; margin-left:auto; padding:3px 6px; border:1px solid #424c5a; border-radius:4px; background:#1c222a; color:#c1cbd8; font-size:calc(9px * var(--fs-scale)); font-weight:650; line-height:1.3; font-family:inherit; white-space:nowrap; cursor:pointer; box-shadow:none; transition:background .15s,border-color .15s,color .15s,box-shadow .15s; }
 .d-target-badge[hidden] { display:none; }
 .d-target-badge:hover { border-color:#627083; background:#252d38; color:#e0e6ef; }
@@ -128,6 +152,7 @@
 .craft-wrap { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; padding:10px; margin-top:auto; }
 .hiddenboard-slot.is-final-goal .craft-wrap { padding-top:10px; padding-bottom:10px; }
 .hiddenboard-slot.has-target .craft-wrap { background:var(--card-surface); }
+.hiddenboard-slot.is-material-ready.has-target .craft-wrap { background:linear-gradient(115deg,#ab7a2d16,#d7a3480a),var(--card-surface); }
 .craft-wrap-left { display:flex; gap:4px; align-items:baseline; }
 .req-text { font:20px var(--font-mono); color:#f4ddba;  text-shadow:none; }
 .req-label { font-size:8px; color:#bfc5d1; }
@@ -152,39 +177,50 @@
 .empty-msg-enhanced { padding:24px 8px; text-align:center; }
 .empty-main { font-size:14px; color:#bfc5d1; }
 @media (min-width:1600px) {
-    .hiddenboard-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+    .hiddenboard-grid { --hb-grade-columns:4; grid-template-columns:repeat(4,minmax(0,1fr)); }
 }
 @media (min-width:768px) and (max-width:1200px) {
-    .hiddenboard-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .hiddenboard-grid { --hb-grade-columns:2; grid-template-columns:repeat(2,minmax(0,1fr)); }
     .hiddenboard-group-title { flex-wrap:wrap; }
 }
 @media (min-width:1025px) and (max-aspect-ratio:11/10) {
-    .hiddenboard-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .hiddenboard-grid { --hb-grade-columns:2; grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
 @media (min-width:1440px) and (max-aspect-ratio:11/10) {
     .unitboard-category-grid,.unitboard-fav-grid,.hiddenboard-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .hiddenboard-grid { --hb-grade-columns:3; }
 }
 @media (768px <= width < 2160px) and (max-aspect-ratio:11/10) and (hover:hover) and (pointer:fine) {
     :root[data-pivot-columns="3"] :is(.unitboard-category-grid,.unitboard-fav-grid,.hiddenboard-grid) { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    :root[data-pivot-columns="3"] .hiddenboard-grid { --hb-grade-columns:3; }
 }
 @media (min-width:2160px) and (max-aspect-ratio:11/10) {
     .unitboard-category-grid,.unitboard-fav-grid,.hiddenboard-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+    .hiddenboard-grid { --hb-grade-columns:4; }
 }
 @media (min-width:768px) and (max-aspect-ratio:11/10) and (hover:hover) and (pointer:fine) {
     :root[data-pivot-columns="4"] :is(.unitboard-category-grid,.unitboard-fav-grid,.hiddenboard-grid) { grid-template-columns:repeat(4,minmax(0,1fr)); }
+    :root[data-pivot-columns="4"] .hiddenboard-grid { --hb-grade-columns:4; }
 }
 @media (hover:none) and (pointer:coarse) and (min-width:768px) and (max-width:1366px) and (min-height:600px) {
     .hiddenboard-grid { grid-template-columns:none; grid-auto-flow:column; grid-auto-columns:100%; gap:12px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; padding-bottom:10px; }
+    #grid-basic-hidden .hiddenboard-grade-group { display:contents; }
     .hiddenboard-page { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:repeat(3,auto); gap:7px; min-width:0; scroll-snap-align:start; align-items:stretch; }
 }
 @media (max-width:767px),
        (min-width:768px) and (max-width:950px) and (max-height:520px) and (orientation:landscape) {
     #boardContent { padding:0; overflow:visible; }
-    .hiddenboard-ph { display:flex; }
+    .hiddenboard-ph { display:flex; justify-content:center; }
+    .hiddenboard-ph-btns.hiddenboard-actions-in-header { width:100%; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .hiddenboard-ph-btns.hiddenboard-actions-in-header .ctrl-btn { width:100%; min-width:0; padding-left:4px; padding-right:4px; }
+    .hiddenboard-ph-btns.hiddenboard-actions-in-header .ctrl-btn + .ctrl-btn::before { left:-7px; }
     .hiddenboard-group-title { flex-wrap:wrap; padding:0 0 10px; }
     .grp-title-main { font-size:13px; }
     .grp-title-actions { margin-left:auto; }
     .hiddenboard-grid { grid-template-columns:none; grid-template-rows:repeat(2,auto); grid-auto-flow:column; grid-auto-columns:100%; gap:8px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; padding-bottom:8px; }
+    #grid-basic-hidden { grid-template-rows:none; }
+    #grid-basic-hidden .hiddenboard-grade-group { display:contents; }
+    #grid-basic-hidden .hiddenboard-page { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:repeat(2,auto); gap:8px; min-width:0; scroll-snap-align:start; }
     .hiddenboard-page { display:contents; }
     .hiddenboard-slot { min-height:116px; scroll-snap-align:none; }
     .hiddenboard-slot:nth-child(2n+1) { scroll-snap-align:start; }
@@ -206,11 +242,10 @@
     .btn-complete { font-size:10px; }
 }
 
-.grp-title-actions > .btn-text-link:disabled { opacity:.38; cursor:default; }
 @media (max-width:767px),(pointer:coarse) {
     .hiddenboard-ph-btns .ctrl-btn,.grp-title-actions > .btn-text-link { min-height:44px; padding-top:10px; padding-bottom:10px; }
 }
-@media (prefers-reduced-motion:reduce) { .reset-btn-pending::after { animation:none; } }
+@media (prefers-reduced-motion:reduce) { .reset-btn-pending::after,.hiddenboard-slot.is-material-ready { animation:none; } .d-material-ready { animation:none; background-position:50% 50%; } }
 
 /* PC: 같은 줄의 이름 / 조건 / 상세 / 완료 영역을 공통 행에 정렬합니다.
    조건이 없는 카드도 조건 행을 공유하며 상세 배경은 완료 영역까지 채웁니다. */
