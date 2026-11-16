@@ -3,7 +3,6 @@
 <head>
     <script>
         window.APP_VERSION = "SLD-NEXUS-V48";
-        window.NEXUS_CACHE_VERSION = "SLD-NEXUS-V48";
         window.NEXUS_BUILD_VERSION = window.APP_VERSION;
         if (new URLSearchParams(window.location.search).get('nexusStandalone') === 'build') {
             document.documentElement.classList.add('nexus-standalone-build');
@@ -15,7 +14,7 @@
         };
         window.nexusAssetUrl = function(src){
             var separator = src.indexOf('?') === -1 ? '?' : '&';
-            return src + separator + 'v=' + encodeURIComponent(window.NEXUS_CACHE_VERSION);
+            return src + separator + 'v=' + encodeURIComponent(window.APP_VERSION);
         };
         window.nexusCleanUpdateParams = function(){
             if(!window.location || !window.history || !window.history.replaceState) return;
