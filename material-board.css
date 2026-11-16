@@ -1,0 +1,84 @@
+/* 재료 체크 — V43 원본 카드·작업 버튼 스타일을 V47의 독립 모듈에 직접 통합 */
+.main-layout.view-invenboard .panel-left { display:none; }
+.main-layout.view-invenboard .panel-right { min-width:0; min-height:0; }
+.main-layout.view-invenboard #boardMobileHeader { display:none; }
+#boardContent.material-board-mode { padding:0; overflow-y:auto; overflow-x:hidden; scrollbar-width:none; }
+#boardContent.material-board-mode::-webkit-scrollbar { display:none; }
+.material-board-workspace { min-height:100%; padding:0; border:0; border-radius:0; background:transparent; color:#e4e7ed; overflow:visible; }
+.material-board-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 16px 16px; border-bottom:1px solid #292b32; background:transparent; }
+.material-board-heading h2 { flex:none; color:var(--g); font-size:calc(14px * var(--fs-scale)); font-weight:700; }
+.material-board-body { padding:16px; background:transparent; }
+.material-board-body .empty-msg { margin-bottom:12px; }
+.material-board-body .empty-msg[hidden] { display:none; }
+
+/* 재료 체크 작업 버튼 — V43 원본의 구분선·투명 배경 텍스트 액션 */
+.material-board-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; column-gap:25px; row-gap:5px; min-width:0; margin-left:auto; padding:0; border:0; }
+.material-board-actions .pc-btn { position:relative; display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:32px; padding:6px 2px; border:0; border-radius:3px; background:transparent; color:#e7d2b0; font-size:10px; font-weight:500; line-height:1.4; white-space:nowrap; transition:color .18s,background .18s; }
+.material-board-actions .pc-btn + .pc-btn::before { content:""; position:absolute; left:-13px; top:50%; width:1px; height:14px; background:var(--line); transform:translateY(-50%); pointer-events:none; }
+.material-board-actions .pc-btn:hover:not(:disabled) { color:var(--g); background:#efd3a409; }
+.material-board-actions .pc-btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.material-board-action-icon { display:inline-flex; align-items:center; justify-content:center; flex:0 0 14px; min-width:14px; color:inherit; font-size:13px; line-height:1; }
+.material-board-actions .material-board-reset { color:var(--text-muted); }
+.material-board-actions .material-board-mode-input.is-manual,.material-board-actions .material-board-slot-toggle.is-expanded { color:var(--g); }
+.material-board-actions .pc-btn:disabled { opacity:.38; }
+
+/* 재료 카드 — 원본 등급색 테두리·이름 색상·수량 및 버튼 배치 */
+.material-board-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:9px; align-content:start; }
+.material-board-slot { display:flex; min-width:0; min-height:157px; border:1px solid #25272d; border-radius:10px; overflow:hidden; background:#000; box-shadow:none; transition:border-color .18s,background .18s,box-shadow .18s; }
+.material-board-slot.has-active { border-color:var(--card-tone,var(--accent)); background:color-mix(in srgb,var(--card-tone,var(--accent)) 5%,#14161d); box-shadow:inset 0 1px 0 #ffffff0b; }
+.material-board-slot.is-split-slot { flex-direction:row; gap:0; }
+.material-board-split-divider { flex:none; width:1px; height:65%; align-self:center; background:#303139; }
+.material-board-slot:not(.has-active) .material-board-controls { background:#000; }
+.material-board-slot:not(.has-active) .material-board-controls .pc-btn { background:transparent; }
+.material-board-item { flex:1; min-width:0; display:flex; flex-direction:column; }
+.material-board-item.is-disabled { opacity:.68; pointer-events:none; filter:grayscale(1); }
+.material-board-item.is-disabled .material-board-grade { border-color:transparent; background:transparent; color:var(--text-muted); }
+.material-board-item.is-disabled .material-board-input { border-color:var(--line); }
+.material-board-item.is-disabled .material-board-caption { visibility:hidden; }
+.material-board-main { --material-value-height:34px; padding:10px 10px 9px; display:flex; flex:1; flex-direction:column; align-items:stretch; gap:4px; }
+.material-board-grade.gtag { align-self:center; font-size:9px; padding:2px 6px; }
+.material-board-name { display:flex; align-items:center; justify-content:center; min-height:2.5em; width:100%; text-align:center; font-size:calc(12px * var(--fs-scale)); font-weight:650; line-height:1.25; overflow-wrap:anywhere; word-break:keep-all; color:var(--material-tone,inherit); }
+.material-board-tap { display:flex; flex-direction:column; justify-content:center; align-items:center; flex:0 0 var(--material-value-height); height:var(--material-value-height); min-height:var(--material-value-height); width:100%; margin-top:auto; border:0; border-radius:6px; background:transparent; color:#f5f6fa; }
+.material-board-tap:disabled { opacity:1; }
+.material-board-count { font:700 26px/1.12 var(--font-mono); letter-spacing:-.8px; text-shadow:none; }
+.material-board-caption { flex:none; color:#98a2b2; font-size:calc(9px * var(--fs-scale)); line-height:1; letter-spacing:.03em; text-align:center; }
+.material-board-controls { display:grid; grid-template-columns:1fr 1fr; gap:5px; padding:7px; border-top:1px solid #ffffff14; background:#0e1016; }
+.material-board-controls .pc-btn { min-width:0; min-height:28px; padding:5px 3px; border:1px solid #343842; border-radius:5px; background:#1b1e25; color:#eef1f6; font-size:calc(11px * var(--fs-scale)); font-weight:650; line-height:1.2; }
+.material-board-controls .pc-btn:hover:not(:disabled) { border-color:var(--card-tone,var(--accent)); background:#262831; }
+.material-board-input { display:none; flex:0 0 var(--material-value-height); height:var(--material-value-height); width:100%; min-width:0; margin-top:auto; outline:none; border:1px solid color-mix(in srgb,var(--material-tone,var(--accent)) 70%,#303139); border-radius:6px; background:#0c0d12; color:#fff; text-align:center; font:700 25px var(--font-mono); appearance:textfield; -moz-appearance:textfield; }
+.material-board-input::-webkit-inner-spin-button,.material-board-input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+.material-board-input::placeholder { color:inherit; opacity:1; }
+.material-board-input:focus { border-color:var(--material-tone,var(--accent)); outline:1px solid var(--material-tone,var(--accent)); outline-offset:2px; }
+.material-board-input.is-over-limit { border-color:#ae7261; background:#3c2220; color:#efb29f; }
+.material-board-item.is-manual .material-board-tap { display:none; }
+.material-board-item.is-manual .material-board-input { display:block; }
+
+/* 반응형 — 원본 카드 스타일을 유지하며 V47의 전 플랫폼 표시를 지원 */
+@media (min-width:1025px) and (min-aspect-ratio:11/10) and (hover:hover) and (pointer:fine) {
+    .material-board-actions .pc-btn { font-size:calc(13px * var(--fs-scale)); }
+}
+@media (max-width:1024px), (pointer:coarse), (max-aspect-ratio:11/10) {
+    #boardContent.material-board-mode { overflow:visible; }
+    .material-board-heading { flex-wrap:wrap; gap:10px; }
+    .material-board-actions { width:100%; margin-left:0; justify-content:center; }
+    .material-board-grid { gap:7px; }
+}
+@media (max-width:767px) {
+    .material-board-heading { padding:12px 10px; }
+    .material-board-heading h2 { width:100%; }
+    .material-board-body { padding:10px; }
+    .material-board-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; gap:7px; }
+    .material-board-actions .pc-btn { min-height:40px; width:100%; padding:6px 4px; border:1px solid #514937; border-radius:6px; background:#19191d; font-size:11px; }
+    .material-board-actions .pc-btn + .pc-btn::before { display:none; }
+    .material-board-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+    .material-board-slot { min-height:154px; }
+    .material-board-main { padding:8px 3px 6px; }
+    .material-board-name { font-size:calc(10px * var(--fs-scale)); }
+    .material-board-count { font-size:21px; }
+    .material-board-controls { gap:3px; padding:4px; }
+    .material-board-controls .pc-btn { min-height:32px; padding:4px 1px; font-size:10px; }
+    .material-board-grade.gtag { font-size:8px; }
+}
+@media (max-width:355px) {
+    .material-board-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}

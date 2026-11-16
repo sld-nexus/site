@@ -136,6 +136,7 @@
             : slot
     );
     const COSTBOARD_DISPLAY_ATOMS = COSTBOARD_DISPLAY_SLOT_DEFS.flatMap(slot => slot.atoms);
+    const MATERIAL_ALL_ATOMS = Object.freeze([...SYSTEM_CONFIG.costboardAtoms, VOID_RAY_ATOM, ...LEGACY_COMPLETION_ATOMS]);
     const GROUP_DEFS = SYSTEM_CONFIG.groupDefs;
     const titleToGridId = Object.fromEntries(GROUP_DEFS.map(g => [g.title, g.pid]));
     const FAVORITES_KEY = SYSTEM_CONFIG.storageKeys?.favorites || 'nexusFavorites';
@@ -209,6 +210,7 @@
     const unitMap = new Map(), activeUnits = new Map(), pausedUnits = new Map(), completedUnits = new Map(), depCache = new Map();
     const completedTargets = new Map(), _unitNativeLevels = new Map(), _unitRestoreLevels = new Map();
     const _selectionResetRetainedCompleted = new Map();
+    const _materialManualInputs = new Map();
     let _actionFeedbackTimer = null;
     const _depVisiting = new Set();
     const GRADE_INDEX_MAP = new Map(SYSTEM_CONFIG.grades.order.map((grade, index) => [grade, index]));
@@ -226,6 +228,7 @@
     let _unitboardCollection = null;
     let _activeTabIdx = 0, _currentViewMode = 'unitboard', _currentHighlight = null, _hideCompleted = false;
     let _highlightGroupState = null;
+    let _buildMaterialsExpanded = false;
     let _cartTab = 'active', _isTabContentInitialized = false, _isHiddenboardRendered = false;
     let repeatTimer = null, repeatDelayTimer = null, _lastInteractionTime = 0, _currentAccelInterval = APP_INTERNAL.accelInterval, _touchHoldCount = 0, _smartChangePointerCardUid = null;
     let updateTimer = null, _completeLock = new Set(), _presetUsed = new Map(), _restoreAllCooldown = false;
@@ -370,7 +373,8 @@
             completedTargets: [...completedTargets],
             cartTab: _cartTab,
             presetUsed: [..._presetUsed],
-            hideCompleted: _hideCompleted
+            hideCompleted: _hideCompleted,
+            materialManualInputs: [..._materialManualInputs]
         };
     }
 
@@ -387,12 +391,17 @@
             _selectionResetRetainedCompleted.clear();
             completedTargets.clear();
             _presetUsed.clear();
+            _materialManualInputs.clear();
 
             hydrateSavedUnitMap(state.active, activeUnits);
             hydrateSavedUnitMap(state.paused, pausedUnits);
             hydrateSavedUnitMap(state.completed, completedUnits, { allowAutoCost: true, keepCompletedQty: true });
             hydrateSavedUnitMap(state.selectionResetRetainedCompleted, _selectionResetRetainedCompleted, { allowAutoCost: true, keepCompletedQty: true });
             hydrateSavedUnitMap(state.completedTargets, completedTargets);
+            for (const [rawId, rawQty] of (Array.isArray(state.materialManualInputs) ? state.materialManualInputs : (state.invenboardManualInputs || []))) {
+                const id = normalizeSavedId(rawId), qty = Math.max(0, parseInt(rawQty, 10) || 0);
+                if (MATERIAL_ALL_ATOMS.some(atom => clean(atom) === id) && qty > 0) _materialManualInputs.set(id, qty);
+            }
             _cartTab = isValidCartTab(state.cartTab) ? state.cartTab : 'active';
             if (Array.isArray(state.presetUsed)) {
                 state.presetUsed.forEach(entry => {
@@ -411,6 +420,7 @@
             _selectionResetRetainedCompleted.clear();
             completedTargets.clear();
             _presetUsed.clear();
+            _materialManualInputs.clear();
         }
     }
 
@@ -1205,6 +1215,7 @@
     }
 
     function renderCostboardAtoms() {
+        const displayedDefs = _buildMaterialsExpanded ? materialBoard.getSlotDefs(true) : COSTBOARD_DISPLAY_SLOT_DEFS;
         const buildSlotClassName = (atoms) => `costboard-slot ${getCostboardSlotToneClass(atoms)}`;
         const renderCostboardSlot = (slot) => {
             const atoms = slot.atoms || [];
@@ -1220,7 +1231,7 @@
             `).join('<div class="costboard-split-divider" aria-hidden="true"></div>');
             return `<div class="${buildSlotClassName(atoms)} is-split-slot" data-slot-atoms="${atoms.map(clean).join(',')}">${splitItems}</div>`;
         };
-        renderBoardSlots('costboardGrid', COSTBOARD_DISPLAY_SLOT_DEFS, renderCostboardSlot);
+        renderBoardSlots('costboardGrid', displayedDefs, renderCostboardSlot);
     }
 
     function calculateCostboardAtomTotals(completedSource = completedUnits, atomList = SYSTEM_CONFIG.costboardAtoms, options = {}) {
@@ -1275,14 +1286,17 @@
     }
 
     function updateCostboard(costboardTotals = null, boardRequirements = null) {
-        const { remainingMap } = costboardTotals || calculateCostboardAtomTotals();
+        const { remainingMap } = _buildMaterialsExpanded
+            ? materialBoard.calculateTotals(true, activeUnits)
+            : (costboardTotals || calculateCostboardAtomTotals());
         const voidRemaining = Math.max(0, (boardRequirements || calculateBoardRequirements()).reqMap.get(VOID_RAY_ID) || 0);
 
-        COSTBOARD_DISPLAY_ATOMS.forEach(atom => {
+        const displayedAtoms = _buildMaterialsExpanded ? MATERIAL_ALL_ATOMS : COSTBOARD_DISPLAY_ATOMS;
+        displayedAtoms.forEach(atom => {
             const container = getEl(`vslot-${clean(atom)}`), valueEl = container?.querySelector('.costboard-val'), nameEl = container?.querySelector('.costboard-name');
             if (!container || !valueEl || !nameEl) return;
 
-            const remainQty = clean(atom) === VOID_RAY_ID ? voidRemaining : (remainingMap[atom] || 0);
+            const remainQty = !_buildMaterialsExpanded && clean(atom) === VOID_RAY_ID ? voidRemaining : (remainingMap[atom] || 0);
             const splitParent = container.closest('.costboard-slot.is-split-slot');
             const isSplitItem = !!splitParent;
             if (remainQty > 0) {
@@ -1303,10 +1317,23 @@
         });
     }
 
+    function toggleBuildMaterialMode() {
+        _buildMaterialsExpanded = !_buildMaterialsExpanded;
+        renderCostboardAtoms();
+        const label = getEl('buildMaterialModeBtn');
+        if (label) {
+            label.querySelector('.build-material-mode-label').textContent = _buildMaterialsExpanded ? '핵심재료 전환' : '전체재료 전환';
+            label.setAttribute('aria-pressed', String(_buildMaterialsExpanded));
+        }
+        getEl('costboardGrid')?.classList.toggle('is-expanded', _buildMaterialsExpanded);
+        updateCostboard();
+    }
+
     /* ==========================================================================
        08. 히든 보드
        ========================================================================== */
     let completeGroup, returnHiddenboardControlsToHeader, renderHiddenboard, switchHiddenboardDetail, placeHiddenboardControls, updateHiddenboard;
+    let materialBoard;
 
     /* ==========================================================================
        09. 히든보드 재료 충족 판정
@@ -1890,7 +1917,11 @@
                 ? ['restoreAllPausedUnits', '보류 복구', '보류된 유닛이 없습니다.', '선택 탭의 보류 버튼을 누르면 이곳으로 이동됩니다.', 'p', ' cart-item-paused']
                 : ['restoreAllCompletedUnits', '완료 복구', '완료된 유닛이 없습니다.', '목표 완료 시 이곳으로 이동됩니다.', 'd', ' cart-item-done'];
         const disabled = source.size === 0 ? 'disabled' : '';
-        const actions = `<div class="cart-tab-action-row"><button type="button" class="cart-tab-action-btn" data-action="${meta[0]}" ${disabled}>${meta[1]}</button><button type="button" class="cart-tab-action-btn" data-action="clearCartItems" ${disabled}>전체 제거</button></div>`;
+        const actionIcon = active
+            ? '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 9v6m4-6v6"/></svg>'
+            : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11a9 9 0 1 1 3 7"/><path d="M3 4v7h7"/></svg>';
+        const removeIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg>';
+        const actions = `<div class="cart-tab-action-row"><button type="button" class="cart-tab-action-btn" data-action="${meta[0]}" ${disabled}>${actionIcon}<span>${meta[1]}</span></button><button type="button" class="cart-tab-action-btn is-danger" data-action="clearCartItems" ${disabled}>${removeIcon}<span>전체 제거</span></button></div>`;
         const rows = getUnitsFromMap(source).map(item => {
             const qty = source.get(item.id) || 1, oneTime = isOneTime(item);
             const quantity = active && !oneTime
@@ -1944,6 +1975,10 @@
 
     function updateBoardPanel(calcResult) {
         updateBoardHeader();
+        if (_currentViewMode === 'invenboard') {
+            materialBoard.render();
+            materialBoard.refresh();
+        }
         if (_currentViewMode === 'hiddenboard') {
             if (!_isHiddenboardRendered) renderHiddenboard();
             if (!_isHiddenboardRendered) return;
@@ -2013,22 +2048,26 @@
         hideRecipeTooltip();
         const layout = getEl('mainLayout');
         if (!layout) return;
-        const nextMode = ['unitboard', 'hiddenboard'].includes(mode) ? mode : 'unitboard';
+        const nextMode = ['unitboard', 'hiddenboard', 'invenboard'].includes(mode) ? mode : 'unitboard';
+        if (_currentViewMode === 'invenboard' && nextMode !== 'invenboard') materialBoard.invalidate();
+        getEl('boardContent')?.classList.toggle('material-board-mode', nextMode === 'invenboard');
         _currentViewMode = nextMode;
         const viewMeta = {
-            unitboard: ['유닛도감', 'UNIT ARCHIVE', '목표를 고르세요. 완성까지 필요한 모든 조합을 연결합니다.'],
-            hiddenboard: ['히든보드', 'COMBINATION BOARD', '목표부터 기본 재료까지, 조합의 흐름을 한눈에 확인하세요.']
+            unitboard: ['유닛 도감', 'UNIT ARCHIVE', '목표를 고르세요. 완성까지 필요한 모든 조합을 연결합니다.'],
+            hiddenboard: ['조합 체크', 'COMBINATION BOARD', '목표부터 기본 재료까지, 조합의 흐름을 한눈에 확인하세요.'],
+            invenboard: ['재료 체크', 'MATERIAL BOARD', '필요한 재료와 보유량을 확인하세요.']
         }[nextMode];
         const title = getEl('workspaceTitle'), breadcrumb = getEl('workspaceBreadcrumb'), description = getEl('workspaceDescription');
         if (title) title.innerHTML = `${viewMeta[0]}<span class="heading-dot">.</span>`;
         if (breadcrumb) breadcrumb.textContent = viewMeta[1];
         if (description) description.textContent = viewMeta[2];
-        layout.classList.remove('view-unitboard', 'view-hiddenboard');
+        layout.classList.remove('view-unitboard', 'view-hiddenboard', 'view-invenboard');
         layout.classList.add(`view-${nextMode}`);
 
         const buttons = {
             unitboard: getEl('btnViewUnitboard'),
-            hiddenboard: getEl('btnViewHiddenboard')
+            hiddenboard: getEl('btnViewHiddenboard'),
+            invenboard: getEl('btnViewInvenboard')
         };
         Object.entries(buttons).forEach(([key, btn]) => {
             if (!btn) return;
@@ -2037,7 +2076,7 @@
             else btn.removeAttribute('aria-current');
         });
 
-        if (nextMode === 'hiddenboard') ensureActiveBoardRendered(_lastCalcResult);
+        if (nextMode === 'hiddenboard' || nextMode === 'invenboard') ensureActiveBoardRendered(_lastCalcResult);
         updateBoardHeader();
     }
 
@@ -2164,6 +2203,12 @@
         const action = actionEl.dataset.action, uid = actionEl.dataset.uid;
         switch (action) {
             case 'switchMainView': switchLayout(actionEl.dataset.view); break;
+            case 'toggleBuildMaterialMode': e.preventDefault(); e.stopPropagation(); toggleBuildMaterialMode(); break;
+            case 'materialAdd': materialBoard.addAmount(actionEl.dataset.materialId, actionEl.dataset.delta); break;
+            case 'materialToggleInput': materialBoard.toggleInput(); break;
+            case 'materialToggleSlots': materialBoard.toggleSlots(); break;
+            case 'materialReset': materialBoard.resetAmounts(); break;
+            case 'materialCompleteAll': materialBoard.completeAll(); break;
             case 'runPreset':
                 const idx = parseInt(actionEl.dataset.presetIdx, 10), preset = PRESETS[idx];
                 if (preset && !_presetUsed.get(idx)) {
@@ -2230,6 +2275,15 @@
         }
     });
 
+    document.addEventListener('change', e => {
+        const input = e.target.closest('.material-board-input[data-material-id]');
+        if (input && !input.disabled) materialBoard.setAmount(input.dataset.materialId, input.value);
+    });
+    document.addEventListener('focusin', e => {
+        const input = e.target.closest('.material-board-input[data-material-id]');
+        if (input && !input.disabled) input.select();
+    });
+
     document.addEventListener('pointerdown', e => {
         _smartChangePointerCardUid = null;
         const actionEl = e.target.closest('[data-action="smartChange"]');
@@ -2282,7 +2336,8 @@
         setHTMLIfChanged,
         get APP_INTERNAL() { return APP_INTERNAL; },
         get AUTO_COST_SLOT_SET() { return AUTO_COST_SLOT_SET; },
-        get AUTO_RECIPE_REQUIREMENT_SET() { return AUTO_RECIPE_REQUIREMENT_SET; },
+        get LEGACY_COMPLETION_ATOMS() { return LEGACY_COMPLETION_ATOMS; },
+        get _materialManualInputs() { return _materialManualInputs; },
         get CLEAN_SPECIAL_CONDITIONS() { return CLEAN_SPECIAL_CONDITIONS; },
         get CLEAN_UNIT_QTY_CAPS() { return CLEAN_UNIT_QTY_CAPS; },
         get COSTBOARD_DISPLAY_SLOT_DEFS() { return COSTBOARD_DISPLAY_SLOT_DEFS; },
@@ -2331,9 +2386,7 @@
         get formatConditionText() { return formatConditionText; },
         get formatRecipe() { return formatRecipe; },
         get getCompletedRecipeReadyQty() { return getCompletedRecipeReadyQty; },
-        get getCostboardAtomRawName() { return getCostboardAtomRawName; },
         get getCostboardDisplayName() { return getCostboardDisplayName; },
-        get getCostboardSlotToneClass() { return getCostboardSlotToneClass; },
         get getDependencies() { return getDependencies; },
         get getEl() { return getEl; },
         get getGradeIndex() { return getGradeIndex; },
@@ -2343,17 +2396,13 @@
         get getUnitQtyLimit() { return getUnitQtyLimit; },
         get getUnitUnitboardEssenceText() { return getUnitUnitboardEssenceText; },
         get getUnitsFromIds() { return getUnitsFromIds; },
-        get getUnitsFromMap() { return getUnitsFromMap; },
         get hideRecipeTooltip() { return hideRecipeTooltip; },
-        get isAutoRecipeRequirementSatisfied() { return isAutoRecipeRequirementSatisfied; },
         get isConditionOnlyRecipe() { return isConditionOnlyRecipe; },
         get isOneTime() { return isOneTime; },
         get isToolRequirement() { return isToolRequirement; },
-        get limitCacheSize() { return limitCacheSize; },
         get normalizeSavedId() { return normalizeSavedId; },
         get normalizeUnitQty() { return normalizeUnitQty; },
         get pausedUnits() { return pausedUnits; },
-        get toggleHighlight() { return toggleHighlight; },
         get placeHiddenboardControls() { return placeHiddenboardControls; },
         get resetCompletedMaterialsByLevel() { return resetCompletedMaterialsByLevel; },
         get returnHiddenboardControlsToHeader() { return returnHiddenboardControlsToHeader; },
@@ -2367,6 +2416,7 @@
         get updatePresetBtns() { return updatePresetBtns; }
     };
     ({ completeGroup, completeUnit, placeHiddenboardControls, renderHiddenboard, resetGroupCompleted, returnHiddenboardControlsToHeader, switchHiddenboardDetail, updateHiddenboard } = window.NEXUS_HIDDEN(boardModuleContext));
+    materialBoard = window.NEXUS_MATERIAL(boardModuleContext);
     ({ bindSwipeEvents, updatePivotColumns } = window.NEXUS_RESPONSIVE(boardModuleContext));
 
 
