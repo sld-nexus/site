@@ -23,7 +23,7 @@ window.NEXUS_RESPONSIVE = function createResponsive(ctx) {
             updatePivotColumns();
             ctx.hideRecipeTooltip();
             ctx.closeFontSizePopup();
-            ctx.placeHiddenboardControls();
+            ctx.placeChecklistControls();
             ctx.updateBoardHeader();
         });
     };
@@ -32,7 +32,7 @@ window.NEXUS_RESPONSIVE = function createResponsive(ctx) {
     window.addEventListener('focus', updatePivotColumns);
     desktopQuery.addEventListener('change', handleViewportChange);
 
-    /* 02. 도감·히든보드 터치 탐색 */
+    /* 02. 도감·체크리스트 터치 탐색 */
     let _swipeTimer = null, _isSwiping = false;
     function bindSwipeEvents() {
         const sArea = ctx.getEl('tabContent');
@@ -81,13 +81,13 @@ window.NEXUS_RESPONSIVE = function createResponsive(ctx) {
             dBoard.addEventListener('touchstart', e => {
                 dX0 = e.changedTouches[0].screenX;
                 dY0 = e.changedTouches[0].screenY;
-                dPager = !!e.target?.closest?.('.hiddenboard-grid');
+                dPager = !!e.target?.closest?.('.checklist-grid');
             }, { passive: true });
             dBoard.addEventListener('touchend', e => {
                 const dx = e.changedTouches[0].screenX - dX0, dy = e.changedTouches[0].screenY - dY0;
                 if (Math.abs(dx) > 80 && Math.abs(dy) < 50) {
                     if (dPager) { dPager = false; return; }
-                    if (dx > 0) ctx.switchLayout('unitboard'); else ctx.switchLayout('hiddenboard');
+                    if (dx > 0) ctx.switchLayout('unitboard'); else ctx.switchLayout('checklist');
                 }
                 dPager = false;
             }, { passive: true });
