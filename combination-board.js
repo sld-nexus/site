@@ -17,59 +17,25 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         while (cursor) { const next = cursor.nextElementSibling; cursor.remove(); cursor = next; }
     }
 
-    const HIDDENBOARD_MOBILE_PAGING = window.matchMedia('(max-width:767px), (min-width:768px) and (max-width:950px) and (max-height:520px) and (orientation:landscape)');
-    let isPagingListenerBound = false;
-
-    function updateGridPages(grid, items, onlyVisible, groupByGrade) {
-        const isMobileGradeLayout = groupByGrade && HIDDENBOARD_MOBILE_PAGING.matches;
-        const key = `${isMobileGradeLayout ? 'mobile:' : ''}${items.map(el => `${el.id}:${onlyVisible && el.style.display === 'none' ? 0 : 1}`).join('|')}`;
+    function updateGridPages(grid, items, onlyVisible) {
+        const key = items.map(el => `${el.id}:${onlyVisible && el.style.display === 'none' ? 0 : 1}`).join('|');
         if (grid._pageKey === key) return;
         const shown = onlyVisible ? items.filter(el => el.style.display !== 'none') : items;
         const hidden = onlyVisible ? items.filter(el => el.style.display === 'none') : [];
-
-        if (groupByGrade) {
-            const existingGroups = new Map(Array.from(grid.children)
-                .filter(el => el.classList.contains('hiddenboard-grade-group'))
-                .map(el => [el.dataset.grade, el]));
-            const grouped = new Map();
-            for (const item of shown) {
-                const grade = ctx.unitMap.get(item.dataset.uid)?.grade || '';
-                if (!grouped.has(grade)) grouped.set(grade, []);
-                grouped.get(grade).push(item);
-            }
-            const nextGroups = [];
-            const pageSize = isMobileGradeLayout ? 2 : 6;
-            for (const [grade, gradeItems] of grouped) {
-                const group = existingGroups.get(grade) || document.createElement('div');
-                group.className = 'hiddenboard-grade-group';
-                group.dataset.grade = grade;
-                const pages = Array.from(group.children).filter(el => el.classList.contains('hiddenboard-page'));
-                const nextPages = [];
-                for (let i = 0; i < gradeItems.length; i += pageSize) {
-                    const page = pages[i / pageSize] || document.createElement('div');
-                    page.className = 'hiddenboard-page';
-                    reconcileChildren(page, gradeItems.slice(i, i + pageSize));
-                    nextPages.push(page);
-                }
-                reconcileChildren(group, nextPages);
-                nextGroups.push(group);
-            }
-            reconcileChildren(grid, [...hidden, ...nextGroups]);
-        } else {
-            const pages = Array.from(grid.children).filter(el => el.classList.contains('hiddenboard-page'));
-            const nextPages = [];
-            for (let i = 0; i < shown.length; i += 6) {
-                const page = pages[i / 6] || document.createElement('div');
-                page.className = 'hiddenboard-page';
-                reconcileChildren(page, shown.slice(i, i + 6));
-                nextPages.push(page);
-            }
-            reconcileChildren(grid, [...hidden, ...nextPages]);
+        const pages = Array.from(grid.children).filter(el => el.classList.contains('hiddenboard-page'));
+        const nextPages = [];
+        for (let i = 0; i < shown.length; i += 6) {
+            const page = pages[i / 6] || document.createElement('div');
+            page.className = 'hiddenboard-page';
+            reconcileChildren(page, shown.slice(i, i + 6));
+            nextPages.push(page);
         }
+        reconcileChildren(grid, [...hidden, ...nextPages]);
         grid._pageKey = key;
     }
 
     /* ── 02 · 보드 생성·작업 버튼 배치 ── */
+    const HIDDENBOARD_MOBILE_PAGING = window.matchMedia('(max-width:767px), (min-width:768px) and (max-width:950px) and (max-height:520px) and (orientation:landscape)');
 
     function renderHiddenboard() {
         if (ctx._isHiddenboardRendered) return;
@@ -97,8 +63,9 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
                 <div class="hiddenboard-grid" id="${pid}" ${isCol?'style="display:none;"':''}></div>
             </div>`;
 
-        const allUnits = Array.from(ctx.unitMap.values());
-        const unitSlots = allUnits.filter(u => ctx.getGradeIndex(u.grade) >= ctx.getGradeIndex(ctx.SYSTEM_CONFIG.policy.minGradeForHiddenboard) && !ctx.AUTO_COST_SLOT_SET.has(u.id)).map(u => renderHiddenboardSlot(u.id, u.name, u.grade)).join('');
+        const unitSlots = Array.from(ctx.unitMap.values())
+            .filter(u => ctx.getGradeIndex(u.grade) >= ctx.getGradeIndex(ctx.SYSTEM_CONFIG.policy.minGradeForHiddenboard) && !ctx.AUTO_COST_SLOT_SET.has(u.id))
+            .map(u => renderHiddenboardSlot(u.id, u.name, u.grade)).join('');
 
         const _exIds = new Set((ctx.SYSTEM_CONFIG.policy.hideCompletedExcludeGroups || []).map(t => ctx.titleToGridId[t]).filter(Boolean));
 
@@ -108,12 +75,6 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
         ctx._hiddenboardSlotElsByUid.clear();
         boardEl.querySelectorAll('.hiddenboard-slot[data-uid]').forEach(el => ctx._hiddenboardSlotElsByUid.set(el.dataset.uid, el));
         ctx._isHiddenboardRendered = true;
-        if (!isPagingListenerBound) {
-            HIDDENBOARD_MOBILE_PAGING.addEventListener('change', () => {
-                if (ctx._isHiddenboardRendered) updateHiddenboard(ctx._lastCalcResult || ctx.calculateBoardRequirements());
-            });
-            isPagingListenerBound = true;
-        }
         placeHiddenboardControls();
     }
 
@@ -367,11 +328,11 @@ window.NEXUS_HIDDEN = function createHiddenboard(ctx) {
                     const levelDiff = (ctx._unitNativeLevels.get(uidB) || 1) - (ctx._unitNativeLevels.get(uidA) || 1);
                     if (levelDiff !== 0) return levelDiff;
                 }
+                const priority = (ctx.SYSTEM_CONFIG.sorting.order[uB?.name]||0) - (ctx.SYSTEM_CONFIG.sorting.order[uA?.name]||0);
                 return ctx.getGradeIndex(uB?.grade) - ctx.getGradeIndex(uA?.grade) ||
-                       (ctx.SYSTEM_CONFIG.sorting.order[uB?.name]||0) - (ctx.SYSTEM_CONFIG.sorting.order[uA?.name]||0) ||
-                       (uA?.name || uidA).localeCompare(uB?.name || uidB);
+                       priority || (uA?.name || uidA).localeCompare(uB?.name || uidB);
             });
-            updateGridPages(grid, children, onlyVisible, grid === grids.basicHidden);
+            updateGridPages(grid, children, onlyVisible);
         });
     }
 

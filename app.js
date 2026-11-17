@@ -480,7 +480,6 @@
             updateBoardPanel(calcResult);
             updateCartUI();
             updatePresetBtns();
-            // 독립 창은 원본 저장 데이터를 읽기만 하며 덮어쓰지 않는다.
             if (!IS_STANDALONE_BUILD) saveNexusState();
         });
     }
@@ -768,7 +767,7 @@
 
     function updatePresetBtns() {
         syncPresetUsageState();
-        PRESETS.forEach((p, i) => {
+        PRESETS.forEach((_, i) => {
             const btn = document.querySelector(`[data-action="runPreset"][data-preset-idx="${i}"]`), used = _presetUsed.get(i);
             if (btn) { btn.disabled = !!used; btn.classList.toggle('gohaeng-used', !!used); btn.removeAttribute('title'); }
         });
@@ -1002,7 +1001,7 @@
        06. 완료·복구·초기화
        ========================================================================== */
 
-    // 재료 체크 전체 완료에서 이동한 목표만 초기화 시 복구하도록 추적한다.
+    // 재료 보드 전체 완료로 이동한 목표만 추적하며, 보유량 초기화와 별개로 유지한다.
     function pruneMaterialCompletedTargets() {
         for (const [uid, qty] of _materialCompletedTargets) {
             if (completedTargets.get(uid) !== qty) _materialCompletedTargets.delete(uid);
@@ -1140,42 +1139,53 @@
         commitNexusStateChange();
     }
 
+    function syncRestoreAllButtons() {
+        const cfg = SYSTEM_CONFIG.policy.restoreAllBtn;
+        const isPending = !!_restoreAllPendingTimer;
+        const isDone = _restoreAllCooldown;
+        const title = isDone ? '전체 내역이 초기화되었습니다'
+            : isPending ? '2초 후 전체 초기화 · 지금 다시 누르면 취소'
+                : '전체 선택·보류·완료 내역 초기화 · 2초 내 다시 누르면 취소';
+        const labelText = isDone ? cfg.labelDone : isPending ? '초기화 대기' : cfg.labelDefault;
+        const stateText = isDone ? '완료' : isPending ? '취소' : '↺';
+        for (const [buttonId, labelId, stateId] of [
+            [cfg.idBtn, cfg.idLabel, 'btnRestoreAllState'],
+            ['materialBoardRestoreAllBtn', 'materialBoardRestoreAllLabel', 'materialBoardRestoreAllState']
+        ]) {
+            const btn = getEl(buttonId), label = getEl(labelId), state = getEl(stateId);
+            if (!btn) continue;
+            if (label) label.textContent = labelText;
+            if (state) state.textContent = stateText;
+            btn.title = title;
+            btn.classList.toggle('reset-btn-pending', isPending);
+            btn.classList.toggle(cfg.classDone, isDone);
+            btn.disabled = isDone;
+        }
+    }
+
     function restoreAllCompleted() {
         if (_restoreAllCooldown) return;
-        const cfg = SYSTEM_CONFIG.policy.restoreAllBtn;
-        const btn = getEl(cfg.idBtn), label = getEl(cfg.idLabel);
-
         if (_restoreAllPendingTimer) {
             clearTimeout(_restoreAllPendingTimer);
             _restoreAllPendingTimer = null;
-            if (label) label.textContent = cfg.labelDefault;
-            if (btn) { btn.classList.remove('reset-btn-pending'); btn.disabled = false; btn.title = '전체 선택·보류·완료 내역 초기화 · 2초 내 다시 누르면 취소'; }
-            const state = getEl('btnRestoreAllState');
-            if (state) state.textContent = '↺';
+            syncRestoreAllButtons();
             return;
         }
 
-        if (label) label.textContent = '초기화 대기';
-        const state = getEl('btnRestoreAllState');
-        if (state) state.textContent = '취소';
-        if (btn) { btn.classList.add('reset-btn-pending'); btn.title = '2초 후 전체 초기화 · 지금 다시 누르면 취소'; }
-
         _restoreAllPendingTimer = setTimeout(() => {
             _restoreAllPendingTimer = null;
-            activeUnits.clear(); pausedUnits.clear(); completedUnits.clear(); _selectionResetRetainedCompleted.clear(); _materialCompletedTargets.clear(); completedTargets.clear();
-            _presetUsed.clear(); updatePresetBtns(); commitNexusStateChange();
-            if (!btn || !label) return;
+            activeUnits.clear(); pausedUnits.clear(); completedUnits.clear(); completedTargets.clear();
+            _selectionResetRetainedCompleted.clear(); _materialCompletedTargets.clear(); _materialManualInputs.clear();
+            _presetUsed.clear(); updatePresetBtns();
+            commitNexusStateChange({ clearHighlight: true });
             _restoreAllCooldown = true;
-            btn.classList.remove('reset-btn-pending');
-            label.textContent = cfg.labelDone; btn.classList.add(cfg.classDone); btn.disabled = true;
-            if (state) state.textContent = '완료';
-            btn.title = '전체 내역이 초기화되었습니다';
+            syncRestoreAllButtons();
             setTimeout(() => {
-                label.textContent = cfg.labelDefault; btn.classList.remove(cfg.classDone); btn.disabled = false; _restoreAllCooldown = false;
-                if (state) state.textContent = '↺';
-                btn.title = '전체 선택·보류·완료 내역 초기화 · 2초 내 다시 누르면 취소';
+                _restoreAllCooldown = false;
+                syncRestoreAllButtons();
             }, APP_INTERNAL.restoreAllResetDelay);
         }, APP_INTERNAL.restoreAllPendingDelay);
+        syncRestoreAllButtons();
     }
 
     function resetCompletedMaterialsByLevel(level) {
@@ -1208,6 +1218,7 @@
        07. 필요 재료·원가 계산
        ========================================================================== */
 
+    let materialBoard;
     const getCostboardAtomRawName = (uid) => ATOM_HASH[uid] || LEGACY_COMPLETION_RAW_MAP[uid] || AUTO_COST_RAW_MAP[uid] || uid;
     const getCostboardDisplayName = (atom) => clean(atom) === VOID_RAY_ID ? '공허포격기' : atom;
     const getCostboardSlotToneClass = (atoms) => atoms.some(atom => AUTO_COST_SLOT_SET.has(clean(atom))) ? 'is-skill-slot' : 'is-magic-slot';
@@ -1223,15 +1234,18 @@
         const renderCostboardSlot = (slot) => {
             const atoms = slot.atoms || [];
             if (atoms.length === 1) {
-                const atom = atoms[0];
-                return `<div class="${buildSlotClassName(atoms)}" id="vslot-${clean(atom)}"><div class="costboard-val"></div><div class="costboard-name" id="name-${clean(atom)}">${escapeHtml(getCostboardDisplayName(atom))}</div></div>`;
+                const atom = atoms[0], id = clean(atom);
+                return `<div class="${buildSlotClassName(atoms)}" id="vslot-${id}"><div class="costboard-val"></div><div class="costboard-name" id="name-${id}">${escapeHtml(getCostboardDisplayName(atom))}</div></div>`;
             }
-            const splitItems = atoms.map(atom => `
-                <div class="costboard-split-item" id="vslot-${clean(atom)}">
+            const splitItems = atoms.map(atom => {
+                const id = clean(atom);
+                return `
+                <div class="costboard-split-item" id="vslot-${id}">
                     <div class="costboard-val"></div>
-                    <div class="costboard-name" id="name-${clean(atom)}">${escapeHtml(getCostboardDisplayName(atom))}</div>
+                    <div class="costboard-name" id="name-${id}">${escapeHtml(getCostboardDisplayName(atom))}</div>
                 </div>
-            `).join('<div class="costboard-split-divider" aria-hidden="true"></div>');
+            `;
+            }).join('<div class="costboard-split-divider" aria-hidden="true"></div>');
             return `<div class="${buildSlotClassName(atoms)} is-split-slot" data-slot-atoms="${atoms.map(clean).join(',')}">${splitItems}</div>`;
         };
         renderBoardSlots('costboardGrid', displayedDefs, renderCostboardSlot);
@@ -1296,10 +1310,11 @@
 
         const displayedAtoms = _buildMaterialsExpanded ? MATERIAL_ALL_ATOMS : COSTBOARD_DISPLAY_ATOMS;
         displayedAtoms.forEach(atom => {
-            const container = getEl(`vslot-${clean(atom)}`), valueEl = container?.querySelector('.costboard-val'), nameEl = container?.querySelector('.costboard-name');
+            const id = clean(atom);
+            const container = getEl(`vslot-${id}`), valueEl = container?.querySelector('.costboard-val'), nameEl = container?.querySelector('.costboard-name');
             if (!container || !valueEl || !nameEl) return;
 
-            const remainQty = !_buildMaterialsExpanded && clean(atom) === VOID_RAY_ID ? voidRemaining : (remainingMap[atom] || 0);
+            const remainQty = !_buildMaterialsExpanded && id === VOID_RAY_ID ? voidRemaining : (remainingMap[atom] || 0);
             const splitParent = container.closest('.costboard-slot.is-split-slot');
             const isSplitItem = !!splitParent;
             if (remainQty > 0) {
@@ -1308,7 +1323,7 @@
                 container.classList.add('active');
                 if (isSplitItem) return;
             } else {
-                const emptyValue = clean(atom) === VOID_RAY_ID ? '-' : '';
+                const emptyValue = id === VOID_RAY_ID ? '-' : '';
                 if (valueEl.textContent !== emptyValue) valueEl.textContent = emptyValue;
                 nameEl.style.display = 'block';
                 container.classList.remove('active');
@@ -1338,7 +1353,6 @@
        08. 히든 보드
        ========================================================================== */
     let completeGroup, returnHiddenboardControlsToHeader, renderHiddenboard, switchHiddenboardDetail, placeHiddenboardControls, updateHiddenboard;
-    let materialBoard;
 
     /* ==========================================================================
        09. 히든보드 재료 충족 판정
@@ -1484,12 +1498,10 @@
     }
 
     /* ── 10-C · 유닛 정보 복사 ── */
-    /* 10-C-1 · 버튼 마크업 */
     function copyUnitButtonHtml(item) {
         return `<button type="button" class="uc-copy-btn" data-action="copyUnitCard" data-uid="${item.id}" aria-label="${escapeHtml(item.name)} 정보 복사" data-nexus-tooltip="유닛 정보 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></button>`;
     }
 
-    /* 10-C-2 · 표시 정보 수집·텍스트 구분자 구성 */
     function getUnitCardCopyText(card) {
         const read = element => String(element?.innerText || element?.textContent || '').replace(/\s+/g, ' ').trim();
         const name = read(card.querySelector('.uc-name-row'));
@@ -1512,7 +1524,6 @@
             ...(special.length ? ['특수 조건: ' + special.join(' / ')] : [])].join(' | ');
     }
 
-    /* 10-C-3 · 클립보드 호환 처리·임시 요소 정리 */
     function copyUnitTextFallback(text) {
         const previousFocus = document.activeElement;
         const field = document.createElement('textarea');
@@ -1532,7 +1543,6 @@
         }
     }
 
-    /* 10-C-4 · 복사 실행·성공 및 실패 안내 */
     async function copyUnitCard(trigger) {
         const card = trigger.closest('.unit-card');
         if (!card) return;
@@ -1579,7 +1589,7 @@
         if (items.length === 0) {
             return `<div class="collection-empty"><span aria-hidden="true">☆</span><h3>자주 쓰는 유닛을 모아두세요</h3><p>카드의 별을 누르면 여기에 모입니다.<br>원래 도감의 위치와 선택 상태는 그대로 유지됩니다.</p><button type="button" class="ctrl-btn" data-action="selectTab" data-tab-idx="${_activeTabIdx}">유닛도감 둘러보기</button></div>`;
         }
-        return `<p class="collection-guide">모든 분류의 즐겨찾기를 한곳에서 확인하세요. 별을 다시 누르면 해제됩니다.</p><div class="unitboard-fav-grid">${buildPagerPages(items.map(item => buildCard(item, 'fav-')), UNITBOARD_MOBILE_PAGING.matches ? 1 : 2, 'unitboard-page unitboard-fav-page')}</div>`;
+        return `<div class="unitboard-fav-grid">${buildPagerPages(items.map(item => buildCard(item, 'fav-')), UNITBOARD_MOBILE_PAGING.matches ? 1 : 2, 'unitboard-page unitboard-fav-page')}</div>`;
     }
     function initAllTabContents() {
         const tc = getEl('tabContent');
@@ -2053,8 +2063,8 @@
         _currentViewMode = nextMode;
         const viewMeta = {
             unitboard: ['유닛 도감', 'UNIT ARCHIVE', '목표를 고르세요. 완성까지 필요한 모든 조합을 연결합니다.'],
-            hiddenboard: ['조합 체크', 'COMBINATION BOARD', '목표부터 기본 재료까지, 조합의 흐름을 한눈에 확인하세요.'],
-            invenboard: ['재료 체크', 'MATERIAL BOARD', '필요한 재료와 보유량을 확인하세요.']
+            hiddenboard: ['조합 보드', 'COMBINATION BOARD', '목표부터 기본 재료까지, 조합의 흐름을 한눈에 확인하세요.'],
+            invenboard: ['재료 보드', 'MATERIAL BOARD', '필요한 재료와 보유량을 확인하세요.']
         }[nextMode];
         const title = getEl('workspaceTitle'), breadcrumb = getEl('workspaceBreadcrumb'), description = getEl('workspaceDescription');
         if (title) title.innerHTML = `${viewMeta[0]}<span class="heading-dot">.</span>`;
@@ -2185,7 +2195,6 @@
 
     document.addEventListener('click', e => {
         if (!e.target.closest('.gh-fontsize-ctrl')) closeFontSizePopup();
-        // 프리셋 메뉴 바깥을 클릭하거나 터치하면 열린 메뉴를 닫습니다.
         const presetDisclosure = document.querySelector('.preset-disclosure[open]');
         if (presetDisclosure && !presetDisclosure.contains(e.target)) presetDisclosure.open = false;
         const pointerCardUid = _smartChangePointerCardUid;
@@ -2246,7 +2255,6 @@
             case 'restoreAllPausedUnits': e.stopPropagation(); restoreAllPausedUnits(); break;
             case 'restoreAllCompletedUnits': e.stopPropagation(); restoreAllCompletedUnits(); break;
             case 'clearCartItems': e.stopPropagation(); clearCartItems(); break;
-            // 카드 정보 복사 전용 분기: 선택·즐겨찾기 동작과 분리한다.
             case 'copyUnitCard': e.preventDefault(); e.stopPropagation(); void copyUnitCard(actionEl); break;
             case 'toggleFavorite': toggleFavorite(uid, e); break;
             case 'smartChange':
@@ -2324,7 +2332,6 @@
         }
     });
 
-    /* 화면 크기 감지·스와이프 이벤트 구현은 responsive.js */
     let updatePivotColumns, bindSwipeEvents;
 
     /* ==========================================================================
@@ -2338,6 +2345,7 @@
         get LEGACY_COMPLETION_ATOMS() { return LEGACY_COMPLETION_ATOMS; },
         get _materialManualInputs() { return _materialManualInputs; },
         get _materialCompletedTargets() { return _materialCompletedTargets; },
+        get syncRestoreAllButtons() { return syncRestoreAllButtons; },
         get CLEAN_SPECIAL_CONDITIONS() { return CLEAN_SPECIAL_CONDITIONS; },
         get CLEAN_UNIT_QTY_CAPS() { return CLEAN_UNIT_QTY_CAPS; },
         get COSTBOARD_DISPLAY_SLOT_DEFS() { return COSTBOARD_DISPLAY_SLOT_DEFS; },

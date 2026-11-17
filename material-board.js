@@ -68,7 +68,10 @@ window.NEXUS_MATERIAL = function createMaterialBoard(ctx) {
         return coreRecipeCache.get(id);
     }
     function coreStock() {
-        return new Map(ctx.SYSTEM_CONFIG.costboardAtoms.map(atom => [ctx.clean(atom), Math.max(0, ctx.completedUnits.get(ctx.clean(atom)) || 0)]));
+        return new Map(ctx.SYSTEM_CONFIG.costboardAtoms.map(atom => {
+            const id = ctx.clean(atom);
+            return [id, Math.max(0, ctx.completedUnits.get(id) || 0)];
+        }));
     }
     function canAssemble(stock, recipe) {
         return recipe.length ? Math.min(...recipe.map(([id, qty]) => Math.floor((stock.get(id) || 0) / qty))) : 0;
@@ -168,12 +171,13 @@ window.NEXUS_MATERIAL = function createMaterialBoard(ctx) {
         ctx._isHiddenboardRendered = false;
         board.classList.remove('highlight-mode');
         board.classList.add('material-board-mode');
-        board.innerHTML = `<section class="material-board-workspace" aria-label="재료 체크">
-            <header class="material-board-heading"><h2>재료 체크</h2>
+        board.innerHTML = `<section class="material-board-workspace" aria-label="재료 보드">
+            <header class="material-board-heading"><h2>재료 보드</h2>
                 <div class="material-board-actions">
                     <button type="button" class="pc-btn material-board-complete-all" id="materialBoardCompleteAllBtn" data-action="materialCompleteAll"><span class="material-board-action-label">전체 완료</span><span class="material-board-action-icon" aria-hidden="true">✓</span></button>
+                    <button type="button" class="pc-btn material-board-reset-all" id="materialBoardRestoreAllBtn" data-action="restoreAllCompleted" title="전체 선택·보류·완료 내역 초기화 · 2초 내 다시 누르면 취소"><span class="material-board-action-label" id="materialBoardRestoreAllLabel" aria-live="polite">전체 초기화</span><span class="reset-action-state" id="materialBoardRestoreAllState" aria-hidden="true">↺</span></button>
                     <button type="button" class="pc-btn material-board-reset" data-action="materialReset"><span class="material-board-action-label">보유량 초기화</span><span class="material-board-action-icon" aria-hidden="true">↺</span></button>
-                    <button type="button" class="pc-btn material-board-mode-input" id="materialBoardInputModeBtn" data-action="materialToggleInput" aria-pressed="false"><span class="material-board-action-label">수동입력 전환</span></button>
+                    <button type="button" class="pc-btn material-board-mode-input" id="materialBoardInputModeBtn" data-action="materialToggleInput" aria-pressed="false"><span class="material-board-action-label">수동입력 전환</span><span class="material-board-action-icon" aria-hidden="true">⇄</span></button>
                     <button type="button" class="pc-btn material-board-slot-toggle" id="materialBoardSlotModeBtn" data-action="materialToggleSlots" aria-pressed="false"><span class="material-board-action-label">전체재료 전환</span><span class="material-board-action-icon" aria-hidden="true">▦</span></button>
                 </div>
             </header>
@@ -182,7 +186,9 @@ window.NEXUS_MATERIAL = function createMaterialBoard(ctx) {
             </div></section>`;
         rendered = true;
         updateModeButtons();
+        ctx.syncRestoreAllButtons();
     }
+    function invalidate() { rendered = false; }
     /* 03. 보유량·완료 상태 갱신 */
     function refresh() {
         if (!rendered) return;
@@ -241,9 +247,8 @@ window.NEXUS_MATERIAL = function createMaterialBoard(ctx) {
         }
         updateModeButtons();
     }
-    function invalidate() { rendered = false; }
-    // 핵심재료를 상위 유닛으로 환산한 경우 수량 감소는 같은 원가를 실제 기록에서 차감한다.
     /* 04. 보유량 입력·환산값 차감 */
+    // 핵심재료를 상위 유닛으로 환산한 경우 수량 감소는 같은 원가를 실제 기록에서 차감한다.
     function removeVirtualParentAmount(parentId, amount) {
         const recipe = getCoreRecipe(parentId);
         if (!recipe.length) return;
@@ -310,14 +315,6 @@ window.NEXUS_MATERIAL = function createMaterialBoard(ctx) {
         let changed = false;
         ALL_IDS.forEach(id => { if (ctx.completedUnits.delete(id)) changed = true; });
         if (ctx._materialManualInputs.size) { ctx._materialManualInputs.clear(); changed = true; }
-        // 재료 체크 전체 완료로 이동한 목표만 복구하고, 기존 조합 완료는 유지한다.
-        for (const [uid, qty] of ctx._materialCompletedTargets) {
-            if (ctx.completedTargets.get(uid) !== qty) continue;
-            ctx.completedTargets.delete(uid);
-            ctx.setActiveUnitQty(uid, (ctx.activeUnits.get(uid) || 0) + qty);
-            changed = true;
-        }
-        ctx._materialCompletedTargets.clear();
         if (changed) ctx.commitNexusStateChange();
     }
     function completeAll() {

@@ -1,4 +1,4 @@
-/* 재료 체크 — 공통 보유량·작업 버튼과 반응형 카드 */
+/* 재료 보드 — 공통 보유량·작업 버튼과 반응형 카드 */
 .main-layout.view-invenboard .panel-left { display:none; }
 .main-layout.view-invenboard .panel-right { min-width:0; min-height:0; }
 .main-layout.view-invenboard #boardMobileHeader { display:none; }
@@ -11,14 +11,16 @@
 .material-board-body .empty-msg { margin-bottom:12px; }
 .material-board-body .empty-msg[hidden] { display:none; }
 
-/* 재료 체크 조작 버튼 */
+/* 재료 보드 조작 버튼 */
 .material-board-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; column-gap:25px; row-gap:5px; min-width:0; margin-left:auto; padding:0; border:0; }
 .material-board-actions .pc-btn { position:relative; display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:32px; padding:6px 2px; border:0; border-radius:3px; background:transparent; color:#e7d2b0; font-size:10px; font-weight:500; line-height:1.4; white-space:nowrap; transition:color .18s,background .18s; }
 .material-board-actions .pc-btn + .pc-btn::before { content:""; position:absolute; left:-13px; top:50%; width:1px; height:14px; background:var(--line); transform:translateY(-50%); pointer-events:none; }
 .material-board-actions .pc-btn:hover:not(:disabled) { color:var(--g); background:#efd3a409; }
 .material-board-actions .pc-btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .material-board-action-icon { display:inline-flex; align-items:center; justify-content:center; flex:0 0 14px; min-width:14px; color:inherit; font-size:13px; line-height:1; }
-.material-board-actions .material-board-reset { color:var(--text-muted); }
+.material-board-actions .material-board-reset,.material-board-actions .material-board-reset-all { color:var(--text-muted); }
+.material-board-actions .material-board-reset-all.reset-btn-pending { color:#efbe98; }
+.material-board-actions .material-board-reset-all.reset-btn-done:disabled { opacity:1; color:#a4d6bc; }
 .material-board-actions .material-board-mode-input.is-manual,.material-board-actions .material-board-slot-toggle.is-expanded { color:var(--g); }
 .material-board-actions .pc-btn:disabled { opacity:.38; }
 
@@ -74,6 +76,7 @@
     .material-board-actions .pc-btn { min-height:40px; width:100%; padding:6px 4px; font-size:calc(13px * var(--fs-scale)); }
     .material-board-actions .pc-btn + .pc-btn::before { left:-4px; }
     .material-board-actions .pc-btn:nth-child(odd)::before { display:none; }
+    .material-board-actions .material-board-slot-toggle { grid-column:1 / -1; }
     .material-board-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
     .material-board-slot { min-height:154px; }
     .material-board-main { padding:8px 3px 6px; }
