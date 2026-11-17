@@ -2068,7 +2068,7 @@
         _currentViewMode = nextMode;
         const viewMeta = {
             unitboard: ['유닛도감', 'UNIT ARCHIVE', '목표를 고르세요. 완성까지 필요한 모든 조합을 연결합니다.'],
-            checklist: ['조합 보드', 'COMBINATION BOARD', '목표부터 기본 재료까지, 조합의 흐름을 한눈에 확인하세요.']
+            checklist: ['체크리스트', 'CHECKLIST', '목표부터 기본 재료까지, 조합의 흐름을 한눈에 확인하세요.']
         }[nextMode];
         const title = getEl('workspaceTitle'), breadcrumb = getEl('workspaceBreadcrumb'), description = getEl('workspaceDescription');
         if (title) title.innerHTML = `${viewMeta[0]}<span class="heading-dot">.</span>`;

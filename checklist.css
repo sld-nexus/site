@@ -1,6 +1,7 @@
 /* 체크리스트 / 진행 상태 */
 .panel-header { flex-shrink:0; }
 .checklist-ph { display:none; justify-content:flex-end; padding:0 0 16px; }
+.checklist-ph.checklist-ph-no-target { display:flex; }
 .checklist-ph-btns { display:flex; align-items:center; gap:25px; }
 .checklist-actions-in-group { margin-left:auto; }
 .checklist-ph-btns[hidden] { display:none; }

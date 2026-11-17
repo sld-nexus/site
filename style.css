@@ -388,16 +388,16 @@ html.nexus-standalone-build,html.nexus-standalone-build body { height:auto; min-
 }
 @media (hover:none) and (pointer:coarse) and (min-width:768px) and (max-width:1366px) and (min-height:600px) {
     .unitboard-category-grid,.unitboard-fav-grid { display:grid; grid-template-columns:none; grid-auto-flow:column; grid-auto-columns:100%; gap:12px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; scroll-padding-inline:8px; padding:7px 8px 14px; }
-    /* 마지막 페이지도 카드 내용 높이만 사용하며 빈 행은 늘리지 않는다. */
-    .unitboard-page { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:repeat(3,max-content); gap:7px; min-width:0; scroll-snap-align:start; align-items:stretch; align-content:start; }
-    .unitboard-fav-page { grid-template-rows:repeat(1,auto); }
+    /* 스와이프 페이지 전체에서 가장 긴 조합조건을 기준으로 모든 카드 높이를 맞춘다. */
+    .unitboard-page { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:repeat(3,minmax(0,1fr)); gap:7px; min-width:0; scroll-snap-align:start; align-items:stretch; align-content:start; }
+    .unitboard-fav-page { grid-template-rows:repeat(1,minmax(0,1fr)); }
 }
 /* 모바일은 가로 1장 · 세로 2장씩 넘기는 카드 구성 */
 @media (max-width:767px),
        (min-width:768px) and (max-width:950px) and (max-height:520px) and (orientation:landscape) {
     .unitboard-category-grid,.unitboard-fav-grid { display:grid; grid-template-columns:none; grid-template-rows:none; grid-auto-flow:column; grid-auto-columns:100%; gap:8px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; scroll-padding-inline:8px; padding:7px 8px 14px; -webkit-overflow-scrolling:touch; }
-    .unitboard-page { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:repeat(2,max-content); gap:8px; min-width:0; scroll-snap-align:start; align-content:start; }
-    .unitboard-fav-page { grid-template-rows:repeat(1,max-content); }
+    .unitboard-page { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:repeat(2,minmax(0,1fr)); gap:8px; min-width:0; scroll-snap-align:start; align-content:start; }
+    .unitboard-fav-page { grid-template-rows:repeat(1,minmax(0,1fr)); }
     .unit-card { width:100%; min-width:0; min-height:185px; scroll-snap-align:none; }
     .uc-card-inner { display:flex; flex-direction:column; height:100%; min-height:0; }
     .uc-head { min-width:0; }
@@ -576,7 +576,6 @@ html.nexus-standalone-build,html.nexus-standalone-build body { height:auto; min-
 .global-header[data-nexus-layout="bar"] .gh-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);flex:0 0 auto;min-width:0;justify-content:center;}
 .global-header[data-nexus-layout="bar"] .gh-nav-btn{flex:0 1 auto;min-width:0;}
 .global-header[data-nexus-layout="bar"] .gh-nav-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.global-header[data-nexus-layout="bar"] .gh-right{flex:0 0 auto;margin-left:0;}
 @media (min-width:768px) and (max-width:1024px),
        (hover:none) and (pointer:coarse) and (min-width:768px) and (max-width:1366px) {
     .global-header[data-nexus-layout="bar"] { gap:10px; padding-inline:12px; }

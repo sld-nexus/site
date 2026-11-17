@@ -97,9 +97,11 @@ window.NEXUS_CHECKLIST = function createChecklist(ctx) {
         const actions = ctx.getEl('checklistGlobalActions');
         const header = ctx.getEl('checklistMobileHeader');
         const desktopHost = ctx.getEl('group-target-actions');
+        const targetGroup = ctx.getEl('group-target');
         if (!actions || !header) return;
-        const inGroup = !CHECKLIST_MOBILE_PAGING.matches && !!desktopHost;
+        const inGroup = !CHECKLIST_MOBILE_PAGING.matches && !!desktopHost && targetGroup?.style.display !== 'none';
         mountChecklistControls(actions, inGroup ? desktopHost : header, inGroup);
+        header.classList.toggle('checklist-ph-no-target', !inGroup && !CHECKLIST_MOBILE_PAGING.matches);
     }
 
     /* ── 03 · 조합법·상위조합·조건 표시 ── */
@@ -353,7 +355,7 @@ window.NEXUS_CHECKLIST = function createChecklist(ctx) {
                     if (icon) icon.style.transform = 'rotate(0deg)';
                 }
             } else if (visibleSlots.length === 0 && grp.dataset.alwaysShow !== 'true') {
-                grp.style.display = 'block';
+                grp.style.display = 'none';
                 g.style.display = 'none'; grp.classList.add('collapsed'); if (icon) icon.style.transform = 'rotate(-90deg)';
             }
             else {
@@ -559,6 +561,7 @@ window.NEXUS_CHECKLIST = function createChecklist(ctx) {
         updateChecklistGroupVisibility(grids, targetHighlight, excludeGridIds);
 
         restoreChecklistGroupState(targetHighlight);
+        placeChecklistControls();
 
         ctx._checklistSlotElsByUid.forEach((el, cleanId) => {
             el.classList.toggle('highlighted-tree', !!ctx._currentHighlight && highlightDeps?.has(cleanId));

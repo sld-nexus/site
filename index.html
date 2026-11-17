@@ -255,16 +255,16 @@
     <meta property="og:image:alt" content="개복디 넥서스">
     <meta name="twitter:image" content="https://sld-nexus.github.io/site/logo.png?v=SLD-NEXUS-V50">
     <meta name="twitter:image:alt" content="개복디 넥서스">
-    <meta name="description" content="유닛도감, 조합 보드 및 나의 조합의 필요 재료와 정수 계산을 제공하는 개복디 넥서스">
+    <meta name="description" content="유닛도감, 체크리스트 및 나의 조합의 필요 재료와 정수 계산을 제공하는 개복디 넥서스">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://sld-nexus.github.io/site/">
     <meta property="og:title" content="개복디 넥서스 - 히든조합&정수 계산 HUB">
-    <meta property="og:description" content="유닛도감, 조합 보드 및 나의 조합의 필요 재료와 정수 계산을 제공하는 개복디 넥서스">
+    <meta property="og:description" content="유닛도감, 체크리스트 및 나의 조합의 필요 재료와 정수 계산을 제공하는 개복디 넥서스">
     <meta property="og:image:width" content="1280">
     <meta property="og:image:height" content="630">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="개복디 넥서스 - 히든조합&정수 계산 HUB">
-    <meta name="twitter:description" content="유닛도감, 조합 보드 및 나의 조합의 필요 재료와 정수 계산을 제공하는 개복디 넥서스">
+    <meta name="twitter:description" content="유닛도감, 체크리스트 및 나의 조합의 필요 재료와 정수 계산을 제공하는 개복디 넥서스">
     <script>
         (function(){
             var icon = document.createElement('link');
@@ -331,10 +331,10 @@
         </div>
         <nav class="gh-center" aria-label="주요 화면">
             <button type="button" id="btnViewUnitboard" class="gh-nav-btn active" data-action="switchMainView" data-view="unitboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7.8C9.2 6 6.5 6 3 7v12c3.5-1 6.2-1 9 .8 2.8-1.8 5.5-1.8 9-.8V7c-3.5-1-6.2-1-9 .8Z"/><path d="M12 7.8V20"/></svg><span class="gh-nav-label">유닛도감</span></button>
-            <button type="button" id="btnViewChecklist" class="gh-nav-btn" data-action="switchMainView" data-view="checklist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M9 11l2 2 4-4M9 17h6"/></svg><span class="gh-nav-label">조합 보드</span></button>
+            <button type="button" id="btnViewChecklist" class="gh-nav-btn" data-action="switchMainView" data-view="checklist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M9 11l2 2 4-4M9 17h6"/></svg><span class="gh-nav-label">체크리스트</span></button>
         </nav>
         <div class="gh-right">
-            <button type="button" id="btnBuildStandalone" class="gh-tool-btn" data-action="openBuildIndependentWindow" aria-label="조합·재료 독립 창" data-nexus-tooltip="조합·재료 독립 창"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4" width="19" height="15" rx="2"/><rect x="11.5" y="11" width="7.5" height="5.5" rx="1"/></svg></button>
+            <button type="button" id="btnBuildStandalone" class="gh-tool-btn" data-action="openBuildIndependentWindow" aria-label="필요재료 독립창" data-nexus-tooltip="필요재료 독립창"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4" width="19" height="15" rx="2"/><rect x="11.5" y="11" width="7.5" height="5.5" rx="1"/></svg></button>
             <a class="gh-tool-btn" data-nexus-view="dps" href="https://sld-builder.github.io/site/" aria-label="개복디 빌더" data-nexus-tooltip="개복디 빌더"><span aria-hidden="true">B</span></a>
             <div class="gh-fontsize-ctrl">
                 <button type="button" class="gh-tool-btn gh-fontsize-trigger" data-action="toggleFontSizePopup" id="btnFontSizePopup" aria-label="글자 크기 조절" aria-controls="fontSizePopup" aria-expanded="false" data-nexus-tooltip="글자 크기 조절">A</button>
@@ -375,7 +375,7 @@
                 <div class="panel-section cart-section" id="cartSection"><div id="cartTabBar" class="cart-tab-bar"></div><div id="cartListArea" class="cart-list-area"></div></div>
             </section>
         </aside>
-        <section class="panel-right hud-panel" id="colRightPanel" aria-label="조합 보드">
+        <section class="panel-right hud-panel" id="colRightPanel" aria-label="체크리스트">
             <div class="panel-header checklist-ph" id="checklistMobileHeader"><div class="checklist-ph-btns" id="checklistGlobalActions"><button type="button" id="btnHideCompleted" class="ctrl-btn" data-action="toggleHideCompleted" aria-pressed="false" title="완료된 재료를 표시하고 있습니다"><span id="btnHideCompletedLabel">완료 숨기기</span><span class="action-state" id="btnHideCompletedState" aria-hidden="true">OFF</span></button><button type="button" id="btnRestoreAll" class="ctrl-btn reset-btn" data-action="restoreAllCompleted" title="전체 선택·보류·완료 내역 초기화 · 2초 내 다시 누르면 취소"><span id="btnRestoreAllLabel" aria-live="polite">전체 초기화</span><span class="reset-action-state" id="btnRestoreAllState" aria-hidden="true">↺</span></button></div></div>
             <div id="checklistContent" class="panel-body"></div>
         </section>
