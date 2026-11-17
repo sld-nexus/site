@@ -14,16 +14,17 @@ window.NEXUS_CHECKLIST = function createChecklist(ctx) {
     }
 
     function updateGridPages(grid, items, onlyVisible) {
-        const key = items.map(el => `${el.id}:${onlyVisible && el.style.display === 'none' ? 0 : 1}`).join('|');
+        const pageSize = CHECKLIST_MOBILE_PAGING.matches ? 2 : 6;
+        const key = `${pageSize}|` + items.map(el => `${el.id}:${onlyVisible && el.style.display === 'none' ? 0 : 1}`).join('|');
         if (grid._pageKey === key) return;
         const shown = onlyVisible ? items.filter(el => el.style.display !== 'none') : items;
         const hidden = onlyVisible ? items.filter(el => el.style.display === 'none') : [];
         const pages = Array.from(grid.children).filter(el => el.classList.contains('checklist-page'));
         const nextPages = [];
-        for (let i = 0; i < shown.length; i += 6) {
-            const page = pages[i / 6] || document.createElement('div');
+        for (let i = 0; i < shown.length; i += pageSize) {
+            const page = pages[i / pageSize] || document.createElement('div');
             page.className = 'checklist-page';
-            reconcileChildren(page, shown.slice(i, i + 6));
+            reconcileChildren(page, shown.slice(i, i + pageSize));
             nextPages.push(page);
         }
         reconcileChildren(grid, [...hidden, ...nextPages]);
@@ -32,6 +33,7 @@ window.NEXUS_CHECKLIST = function createChecklist(ctx) {
 
     /* ── 02 · 보드 생성·작업 버튼 배치 ── */
     const CHECKLIST_MOBILE_PAGING = window.matchMedia('(max-width:767px), (min-width:768px) and (max-width:950px) and (max-height:520px) and (orientation:landscape)');
+    CHECKLIST_MOBILE_PAGING.addEventListener('change', () => updateChecklist());
 
     function renderChecklist() {
         if (ctx._isChecklistRendered) return;
@@ -377,7 +379,7 @@ window.NEXUS_CHECKLIST = function createChecklist(ctx) {
     }
 
     // PC의 subgrid 행 정렬을 유지하면서 같은 영역의 모든 카드 총높이를 통일합니다.
-    // 모바일·태블릿은 checklist.css의 동일 비율 행을 사용합니다.
+    // 모바일·태블릿 페이지는 실제 카드 수만큼 행을 생성합니다.
     const CHECKLIST_SUBGRID_LAYOUT = window.matchMedia('(min-width:768px) and (min-height:521px) and (hover:hover) and (pointer:fine)');
     let checklistCardFrame = 0;
     function scheduleChecklistCardHeights() {
