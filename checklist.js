@@ -4,10 +4,6 @@ window.NEXUS_CHECKLIST = function createChecklist(ctx) {
 
     /* ── 01 · 카드·페이지 DOM 재사용 ── */
 
-    const BASIC_CHECKLIST_GRADES = new Set(["레어", "에픽", "유니크", "헬", "레전드"]);
-
-    const isBasicChecklistGrade = (grade) => BASIC_CHECKLIST_GRADES.has(grade);
-
     function reconcileChildren(parent, children) {
         let cursor = parent.firstElementChild;
         for (const child of children) {
@@ -75,6 +71,8 @@ window.NEXUS_CHECKLIST = function createChecklist(ctx) {
         ctx._checklistSlotElsByUid.clear();
         boardEl.querySelectorAll('.checklist-slot[data-uid]').forEach(el => ctx._checklistSlotElsByUid.set(el.dataset.uid, el));
         ctx._isChecklistRendered = true;
+        window.addEventListener('resize', scheduleChecklistCardHeights);
+        document.fonts?.ready.then(scheduleChecklistCardHeights);
         placeChecklistControls();
     }
 
@@ -150,8 +148,7 @@ window.NEXUS_CHECKLIST = function createChecklist(ctx) {
             tab.classList.toggle('is-active', selected);
             if (tab.getAttribute('aria-pressed') !== String(selected)) tab.setAttribute('aria-pressed', String(selected));
         });
-        // 두 패널의 높이를 함께 확보하여 탭 전환에도 카드와 하단 버튼 정렬을 유지합니다.
-        // 클릭할 수 있는 상위조합 태그는 선택된 탭에서만 활성화합니다.
+        // 선택된 정보 패널만 표시하고 다른 패널의 클릭을 비활성화합니다.
         for (const [panel, selected] of [
             [slotEl.querySelector('.d-reason-wrap'), activeView === 'usage'],
             [slotEl.querySelector('.d-recipe-wrap'), activeView === 'recipe']
@@ -161,6 +158,7 @@ window.NEXUS_CHECKLIST = function createChecklist(ctx) {
             if (panel.inert !== !selected) panel.inert = !selected;
         }
         renderChecklistRecipe(slotEl, calcResult);
+        scheduleChecklistCardHeights();
     }
 
     function getChecklistReasonDisplayEntries(slotId, rMap, reqMap) {
@@ -270,6 +268,10 @@ window.NEXUS_CHECKLIST = function createChecklist(ctx) {
 
     /* ── 04 · 재료 깊이·정렬·그룹 표시 ── */
 
+    const BASIC_CHECKLIST_GRADES = new Set(["레어", "에픽", "유니크", "헬", "레전드"]);
+
+    const isBasicChecklistGrade = (grade) => BASIC_CHECKLIST_GRADES.has(grade);
+
     function getChecklistDepths(mergedSlots) {
         const exactDepths = new Map();
         let queue = [];
@@ -371,6 +373,33 @@ window.NEXUS_CHECKLIST = function createChecklist(ctx) {
             const total = countBase.length;
             const done = countBase.filter(el => el.classList.contains('is-completed')).length;
             badge.textContent = total > 0 ? `${done} / ${total}` : '';
+        });
+    }
+
+    // PC의 subgrid 행 정렬을 유지하면서 같은 영역의 모든 카드 총높이를 통일합니다.
+    // 모바일·태블릿은 checklist.css의 동일 비율 행을 사용합니다.
+    const CHECKLIST_SUBGRID_LAYOUT = window.matchMedia('(min-width:768px) and (min-height:521px) and (hover:hover) and (pointer:fine)');
+    let checklistCardFrame = 0;
+    function scheduleChecklistCardHeights() {
+        if (checklistCardFrame) return;
+        checklistCardFrame = requestAnimationFrame(() => {
+            checklistCardFrame = 0;
+            const grids = ctx.GROUP_DEFS.map(group => ctx.getEl(group.pid)).filter(Boolean);
+            // 이전 측정값을 제거한 후 현재 글씨 크기·내용·화면 폭으로 다시 계산합니다.
+            grids.forEach(grid => { grid.style.gridTemplateRows = ''; });
+            if (!CHECKLIST_SUBGRID_LAYOUT.matches || !CSS.supports('grid-template-rows', 'subgrid')) return;
+            grids.forEach(grid => {
+                if (getComputedStyle(grid).display !== 'grid') return;
+                const rows = getComputedStyle(grid).gridTemplateRows.split(/\s+/).map(parseFloat);
+                if (rows.length < 8 || rows.length % 4 !== 0 || !rows.every(Number.isFinite)) return;
+                const heights = [];
+                for (let i = 0; i < rows.length; i += 4) {
+                    heights.push(rows[i] + rows[i + 1] + rows[i + 2] + rows[i + 3]);
+                }
+                const maxHeight = Math.max(...heights);
+                heights.forEach((height, i) => { rows[i * 4 + 2] += maxHeight - height; });
+                grid.style.gridTemplateRows = rows.map(height => `${height.toFixed(3)}px`).join(' ');
+            });
         });
     }
 
@@ -562,6 +591,7 @@ window.NEXUS_CHECKLIST = function createChecklist(ctx) {
 
         restoreChecklistGroupState(targetHighlight);
         placeChecklistControls();
+        scheduleChecklistCardHeights();
 
         ctx._checklistSlotElsByUid.forEach((el, cleanId) => {
             el.classList.toggle('highlighted-tree', !!ctx._currentHighlight && highlightDeps?.has(cleanId));
@@ -759,6 +789,6 @@ window.NEXUS_CHECKLIST = function createChecklist(ctx) {
 
     /* ── 공개 API ── */
 
-    return { completeGroup, completeUnit, placeChecklistControls, renderChecklist, resetGroupCompleted, returnChecklistControlsToHeader, switchChecklistDetail, updateChecklist };
+    return { completeGroup, completeUnit, placeChecklistControls, renderChecklist, resetGroupCompleted, returnChecklistControlsToHeader, scheduleChecklistCardHeights, switchChecklistDetail, updateChecklist };
 
 };

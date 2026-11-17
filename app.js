@@ -261,9 +261,6 @@
         const normalized = normalizeUnitQty(uid, qty);
         if (normalized > 0) map.set(uid, normalized);
     };
-    const CART_TABS = ['active', 'paused', 'done'];
-    const isValidCartTab = (tab) => CART_TABS.includes(tab);
-    const setCartTab = (tab) => { _cartTab = isValidCartTab(tab) ? tab : 'active'; };
     const setActiveUnitQty = (uid, qty, { add = false } = {}) => {
         const unit = unitMap.get(uid);
         if (!unit || isRestrictedUnit(uid)) return false;
@@ -1364,7 +1361,76 @@
     /* ==========================================================================
        08. 체크리스트
        ========================================================================== */
-    let completeGroup, returnChecklistControlsToHeader, renderChecklist, switchChecklistDetail, placeChecklistControls, updateChecklist;
+
+    /* 체크리스트·반응형 모듈 공유 인터페이스: 상태 복제 없이 getter로 참조 */
+    const checklistModuleContext = {
+        setHTMLIfChanged,
+        get APP_INTERNAL() { return APP_INTERNAL; },
+        get AUTO_COST_SLOT_SET() { return AUTO_COST_SLOT_SET; },
+        get CLEAN_SPECIAL_CONDITIONS() { return CLEAN_SPECIAL_CONDITIONS; },
+        get CLEAN_UNIT_QTY_CAPS() { return CLEAN_UNIT_QTY_CAPS; },
+        get DEFAULT_REASON_TAG_CLASS() { return DEFAULT_REASON_TAG_CLASS; },
+        get GROUP_DEFS() { return GROUP_DEFS; },
+        get REASON_GRADE_ORDER() { return REASON_GRADE_ORDER; },
+        get SYSTEM_CONFIG() { return SYSTEM_CONFIG; },
+        get _activeTabIdx() { return _activeTabIdx; },
+        set _activeTabIdx(value) { _activeTabIdx = value; },
+        get _completeLock() { return _completeLock; },
+        set _completeLock(value) { _completeLock = value; },
+        get _currentHighlight() { return _currentHighlight; },
+        set _currentHighlight(value) { _currentHighlight = value; },
+        get _checklistSlotElsByUid() { return _checklistSlotElsByUid; },
+        get _hideCompleted() { return _hideCompleted; },
+        set _hideCompleted(value) { _hideCompleted = value; },
+        get _highlightGroupState() { return _highlightGroupState; },
+        set _highlightGroupState(value) { _highlightGroupState = value; },
+        get _isChecklistRendered() { return _isChecklistRendered; },
+        set _isChecklistRendered(value) { _isChecklistRendered = value; },
+        get _lastCalcResult() { return _lastCalcResult; },
+        set _lastCalcResult(value) { _lastCalcResult = value; },
+        get _presetUsed() { return _presetUsed; },
+        set _presetUsed(value) { _presetUsed = value; },
+        get _selectionResetRetainedCompleted() { return _selectionResetRetainedCompleted; },
+        get _unitNativeLevels() { return _unitNativeLevels; },
+        get _unitRestoreLevels() { return _unitRestoreLevels; },
+        get _unitboardCollection() { return _unitboardCollection; },
+        set _unitboardCollection(value) { _unitboardCollection = value; },
+        get activeUnits() { return activeUnits; },
+        get calculateBoardRequirements() { return calculateBoardRequirements; },
+        get closeFontSizePopup() { return closeFontSizePopup; },
+        get commitNexusStateChange() { return commitNexusStateChange; },
+        get compareUnitByGradeName() { return compareUnitByGradeName; },
+        get compareUnitByChecklistPriority() { return compareUnitByChecklistPriority; },
+        get completedTargets() { return completedTargets; },
+        get completedUnits() { return completedUnits; },
+        get deleteCompletedRecipe() { return deleteCompletedRecipe; },
+        get escapeHtml() { return escapeHtml; },
+        get formatConditionText() { return formatConditionText; },
+        get formatRecipe() { return formatRecipe; },
+        get getCompletedRecipeReadyQty() { return getCompletedRecipeReadyQty; },
+        get getDependencies() { return getDependencies; },
+        get getEl() { return getEl; },
+        get getGradeIndex() { return getGradeIndex; },
+        get getGroupRestoreIds() { return getGroupRestoreIds; },
+        get getToolNeed() { return getToolNeed; },
+        get getUnitCardNotesHtml() { return getUnitCardNotesHtml; },
+        get getUnitQtyLimit() { return getUnitQtyLimit; },
+        get getUnitUnitboardEssenceText() { return getUnitUnitboardEssenceText; },
+        get getUnitsFromIds() { return getUnitsFromIds; },
+        get hideRecipeTooltip() { return hideRecipeTooltip; },
+        get isOneTime() { return isOneTime; },
+        get placeChecklistControls() { return placeChecklistControls; },
+        get resetCompletedMaterialsByLevel() { return resetCompletedMaterialsByLevel; },
+        get selectTab() { return selectTab; },
+        get setActiveUnitQty() { return setActiveUnitQty; },
+        get showActionFeedback() { return showActionFeedback; },
+        get switchLayout() { return switchLayout; },
+        get titleToGridId() { return titleToGridId; },
+        get unitMap() { return unitMap; },
+        get updateBoardHeader() { return updateBoardHeader; },
+        get updatePresetBtns() { return updatePresetBtns; }
+    };
+    let completeGroup, returnChecklistControlsToHeader, renderChecklist, switchChecklistDetail, placeChecklistControls, scheduleChecklistCardHeights, updateChecklist;
 
     /* ==========================================================================
        09. 체크리스트 재료 충족 판정
@@ -1754,6 +1820,11 @@
     /* ==========================================================================
        11. 나의 조합·독립 창·선택 목록
        ========================================================================== */
+
+    /* 선택 목록 탭 상태: 기본값 및 허용 탭을 한 곳에서 관리 */
+    const CART_TABS = ['active', 'paused', 'done'];
+    const isValidCartTab = (tab) => CART_TABS.includes(tab);
+    const setCartTab = (tab) => { _cartTab = isValidCartTab(tab) ? tab : 'active'; };
 
     /* 나의 조합 · 필요 재료 독립 창: 원본 탭에 의존하지 않는 자체 페이지 */
     function updateBuildWindowButton() {
@@ -2159,6 +2230,7 @@
         const label = getEl('fontSizeLabel');
         if (label) label.innerText = `${Math.round(_fontScale * 100)}%`;
         try { localStorage.setItem(SYSTEM_CONFIG.storageKeys.fontScale, String(_fontScale)); } catch {}
+        scheduleChecklistCardHeights?.();
     }
 
     function loadFontScale() {
@@ -2267,6 +2339,7 @@
                 if (grp) {
                     if (grp.classList.contains('collapsed') || (gridEl && gridEl.style.display === 'none')) { grp.classList.remove('collapsed'); if (gridEl) gridEl.style.display = 'grid'; if (icon) icon.style.transform = 'rotate(0deg)'; }
                     else { grp.classList.add('collapsed'); if (gridEl) gridEl.style.display = 'none'; if (icon) icon.style.transform = 'rotate(-90deg)'; }
+                    scheduleChecklistCardHeights();
                 }
                 break;
             case 'addComplete': e.stopPropagation(); completeUnit(uid, parseInt(actionEl.dataset.batch || 1, 10)); break;
@@ -2326,83 +2399,7 @@
     /* ==========================================================================
        14. 앱 초기화
        ========================================================================== */
-    /* 기능별 모듈 연결: 공통 상태를 복제하지 않고 기존 app.js 스코프를 공유 */
-    const checklistModuleContext = {
-        setHTMLIfChanged,
-        get APP_INTERNAL() { return APP_INTERNAL; },
-        get AUTO_COST_SLOT_SET() { return AUTO_COST_SLOT_SET; },
-        get CLEAN_SPECIAL_CONDITIONS() { return CLEAN_SPECIAL_CONDITIONS; },
-        get CLEAN_UNIT_QTY_CAPS() { return CLEAN_UNIT_QTY_CAPS; },
-        get DEFAULT_REASON_TAG_CLASS() { return DEFAULT_REASON_TAG_CLASS; },
-        get GROUP_DEFS() { return GROUP_DEFS; },
-        get REASON_GRADE_ORDER() { return REASON_GRADE_ORDER; },
-        get SYSTEM_CONFIG() { return SYSTEM_CONFIG; },
-        get _activeTabIdx() { return _activeTabIdx; },
-        set _activeTabIdx(value) { _activeTabIdx = value; },
-        get _completeLock() { return _completeLock; },
-        set _completeLock(value) { _completeLock = value; },
-        get _currentHighlight() { return _currentHighlight; },
-        set _currentHighlight(value) { _currentHighlight = value; },
-        get _currentViewMode() { return _currentViewMode; },
-        set _currentViewMode(value) { _currentViewMode = value; },
-        get _checklistSlotElsByUid() { return _checklistSlotElsByUid; },
-        get _hideCompleted() { return _hideCompleted; },
-        set _hideCompleted(value) { _hideCompleted = value; },
-        get _highlightGroupState() { return _highlightGroupState; },
-        set _highlightGroupState(value) { _highlightGroupState = value; },
-        get _isChecklistRendered() { return _isChecklistRendered; },
-        set _isChecklistRendered(value) { _isChecklistRendered = value; },
-        get _lastCalcResult() { return _lastCalcResult; },
-        set _lastCalcResult(value) { _lastCalcResult = value; },
-        get _presetUsed() { return _presetUsed; },
-        set _presetUsed(value) { _presetUsed = value; },
-        get _selectionResetRetainedCompleted() { return _selectionResetRetainedCompleted; },
-        get _unitNativeLevels() { return _unitNativeLevels; },
-        get _unitRestoreLevels() { return _unitRestoreLevels; },
-        get _unitboardCollection() { return _unitboardCollection; },
-        set _unitboardCollection(value) { _unitboardCollection = value; },
-        get activeUnits() { return activeUnits; },
-        get calculateBoardRequirements() { return calculateBoardRequirements; },
-        get clean() { return clean; },
-        get closeFontSizePopup() { return closeFontSizePopup; },
-        get commitNexusStateChange() { return commitNexusStateChange; },
-        get compareUnitByGradeName() { return compareUnitByGradeName; },
-        get compareUnitByChecklistPriority() { return compareUnitByChecklistPriority; },
-        get completedTargets() { return completedTargets; },
-        get completedUnits() { return completedUnits; },
-        get deleteCompletedRecipe() { return deleteCompletedRecipe; },
-        get escapeHtml() { return escapeHtml; },
-        get formatConditionText() { return formatConditionText; },
-        get formatRecipe() { return formatRecipe; },
-        get getCompletedRecipeReadyQty() { return getCompletedRecipeReadyQty; },
-        get getDependencies() { return getDependencies; },
-        get getEl() { return getEl; },
-        get getGradeIndex() { return getGradeIndex; },
-        get getGroupRestoreIds() { return getGroupRestoreIds; },
-        get getToolNeed() { return getToolNeed; },
-        get getUnitCardNotesHtml() { return getUnitCardNotesHtml; },
-        get getUnitQtyLimit() { return getUnitQtyLimit; },
-        get getUnitUnitboardEssenceText() { return getUnitUnitboardEssenceText; },
-        get getUnitsFromIds() { return getUnitsFromIds; },
-        get hideRecipeTooltip() { return hideRecipeTooltip; },
-        get isConditionOnlyRecipe() { return isConditionOnlyRecipe; },
-        get isOneTime() { return isOneTime; },
-        get isToolRequirement() { return isToolRequirement; },
-        get pausedUnits() { return pausedUnits; },
-        get placeChecklistControls() { return placeChecklistControls; },
-        get resetCompletedMaterialsByLevel() { return resetCompletedMaterialsByLevel; },
-        get returnChecklistControlsToHeader() { return returnChecklistControlsToHeader; },
-        get restoreCompletedTarget() { return restoreCompletedTarget; },
-        get selectTab() { return selectTab; },
-        get setActiveUnitQty() { return setActiveUnitQty; },
-        get showActionFeedback() { return showActionFeedback; },
-        get switchLayout() { return switchLayout; },
-        get titleToGridId() { return titleToGridId; },
-        get unitMap() { return unitMap; },
-        get updateBoardHeader() { return updateBoardHeader; },
-        get updatePresetBtns() { return updatePresetBtns; }
-    };
-    ({ completeGroup, completeUnit, placeChecklistControls, renderChecklist, resetGroupCompleted, returnChecklistControlsToHeader, switchChecklistDetail, updateChecklist } = window.NEXUS_CHECKLIST(checklistModuleContext));
+    ({ completeGroup, completeUnit, placeChecklistControls, renderChecklist, resetGroupCompleted, returnChecklistControlsToHeader, scheduleChecklistCardHeights, switchChecklistDetail, updateChecklist } = window.NEXUS_CHECKLIST(checklistModuleContext));
     ({ bindSwipeEvents, updatePivotColumns } = window.NEXUS_RESPONSIVE(checklistModuleContext));
 
     /* 부팅 상태 전달 */

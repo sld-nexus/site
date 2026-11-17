@@ -85,7 +85,7 @@ svg { display:block; width:20px; height:20px; flex-shrink:0; }
     .gh-title-mainline { font-size:13.5px; padding:0; }
     .gh-title-subline { font-size:8.75px; }
     .gh-center { position:static; transform:none; display:grid; width:100%; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; margin:0 auto; }
-    .gh-nav-btn { flex-direction:column; justify-content:center; width:100%; min-width:0; padding:7px 2px; min-height:50px; gap:3px; border-radius:7px; }
+    .gh-nav-btn { flex-direction:row; justify-content:center; width:100%; min-width:0; padding:7px 2px; min-height:50px; gap:6px; border-radius:7px; }
     .gh-nav-btn svg { width:19px; height:19px; flex-shrink:0; }
     .gh-nav-label { min-width:0; font-size:clamp(10px,3vw,12px); white-space:nowrap; }
     .gh-right { position:absolute; right:16px; top:6px; gap:10px; }
@@ -422,6 +422,20 @@ html.nexus-standalone-build,html.nexus-standalone-build body { height:auto; min-
     .smart-stepper { margin-left:auto; min-width:96px; height:28px; }
     .smart-stepper button { width:31px; height:26px; }
     .uc-limit { font-size:9px; }
+}
+
+/* 태블릿 세로형 도감 카드 열 수·고해상도 피벗 열 수 */
+@media (min-width:1440px) and (max-aspect-ratio:11/10) {
+    .unitboard-category-grid,.unitboard-fav-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+@media (768px <= width < 2160px) and (max-aspect-ratio:11/10) and (hover:hover) and (pointer:fine) {
+    :root[data-pivot-columns="3"] :is(.unitboard-category-grid,.unitboard-fav-grid) { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+@media (min-width:2160px) and (max-aspect-ratio:11/10) {
+    .unitboard-category-grid,.unitboard-fav-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+}
+@media (min-width:768px) and (max-aspect-ratio:11/10) and (hover:hover) and (pointer:fine) {
+    :root[data-pivot-columns="4"] :is(.unitboard-category-grid,.unitboard-fav-grid) { grid-template-columns:repeat(4,minmax(0,1fr)); }
 }
 
 /* 나의 조합 / 필요 재료 / 정수 / 선택 유닛 목록 */
