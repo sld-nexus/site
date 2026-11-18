@@ -54,7 +54,8 @@
 @keyframes reset-wait { from { transform:scaleX(1); } to { transform:scaleX(0); } }
 .checklist-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding-top:14px; align-items:stretch; }
 .checklist-page { display:contents; }
-.checklist-slot { display:none; flex-direction:column; position:relative; min-width:0; overflow:hidden; min-height:0; transition:opacity .2s,filter .2s,background .18s,border-color .2s,box-shadow .18s; }
+.checklist-slot { display:none; flex-direction:column; position:relative; min-width:0; overflow:hidden; min-height:178px; transition:opacity .2s,filter .2s,background .18s,border-color .2s,box-shadow .18s; }
+.checklist-slot.is-final-goal { min-height:0; }
 .checklist-slot.is-visible { display:flex; }
 .checklist-slot.has-target { background:var(--card-surface); }
 .checklist-slot.is-material-ready:not(.is-completed) {
@@ -99,7 +100,7 @@
 .d-recipe-meta,.checklist-slot[data-detail-view="recipe"] .d-usage-hint { display:none; }
 .checklist-slot[data-detail-view="recipe"] .d-recipe-meta { display:block; }
 .d-detail-panels { display:block; min-width:0; max-height:none; overflow:visible; }
-.d-reason-wrap,.d-recipe-wrap { grid-area:1 / 1; display:flex; flex-direction:column; min-width:0; gap:2px; padding:2px 14px 9px; }
+.d-reason-wrap,.d-recipe-wrap { grid-area:1 / 1; display:flex; flex-direction:column; min-width:0; gap:2px; padding:9px 16px 12px; }
 .d-detail-panels > [aria-hidden="true"] { display:none; }
 .d-reason-wrap:empty::after { content:"상위조합 없음"; padding:5px 0; color:var(--text-muted); font-size:calc(11px * var(--fs-scale)); }
 .d-recipe-count { color:var(--text-sub); font-weight:400; white-space:nowrap; }
@@ -135,9 +136,9 @@
 .tag-grade-슈퍼히든 { --reason-tone:var(--grade-super); }
 .tag-reason-default { --reason-tone:var(--text-sub); }
 /* 04. 카드 이름·조건·완료·정수 정보 */
-.d-slot-main { display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding:10px; }
+.d-slot-main { display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding:15px 16px; }
 .checklist-slot:not(.is-final-goal) .uc-essence-summary { display:none; }
-.checklist-slot.is-final-goal .d-slot-main { padding-bottom:10px; }
+.checklist-slot.is-final-goal .d-slot-main { padding-bottom:8px; }
 .d-grade-row { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; width:100%; max-width:100%; }
 .d-grade-left { display:flex; align-items:center; flex-wrap:wrap; gap:7px; min-width:0; }
 .d-grade-actions { display:flex; align-items:flex-end; justify-content:flex-end; gap:5px; margin-left:auto; min-width:0; }
@@ -159,13 +160,13 @@
 .d-slot-main .uc-notes { margin-top:0; width:100%; }
 .d-slot-main .uc-essence-summary { margin-top:0; width:100%; gap:7px; }
 
-.d-cond-inline { display:none; flex-direction:column; gap:4px; width:100%; min-width:0; padding:10px; border-top:1px solid #303139; color:#e1e7f0; font-size:calc(11px * var(--fs-scale)); line-height:1.65; }
-.d-cond-inline .recipe-label { margin:0; }
+.d-cond-inline { display:none; flex-direction:column; gap:4px; width:100%; min-width:0; padding:13px 16px 12px; border-top:1px solid #303139; color:#e1e7f0; font-size:calc(11px * var(--fs-scale)); line-height:1.65; }
+.d-cond-inline .recipe-label { margin:0 0 2px; }
 .d-condition-row { display:flex; align-items:baseline; justify-content:space-between; gap:8px; width:100%; }
 .d-cond-text { min-width:0; word-break:keep-all; overflow-wrap:anywhere; }
 .d-cond-qty { flex-shrink:0; margin-left:auto; color:var(--text-sub); font:calc(11px * var(--fs-scale))/1.65 var(--font-mono); white-space:nowrap; }
-.craft-wrap { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; padding:10px; margin-top:auto; }
-.checklist-slot.is-final-goal .craft-wrap { padding-top:10px; padding-bottom:10px; }
+.craft-wrap { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; padding:10px 16px; margin-top:auto; }
+.checklist-slot.is-final-goal .craft-wrap { padding-top:7px; padding-bottom:8px; }
 .checklist-slot.has-target .craft-wrap { background:var(--card-surface); }
 .checklist-slot.is-material-ready.has-target .craft-wrap { background:linear-gradient(115deg,#ab7a2d16,#d7a3480a),var(--card-surface); }
 .craft-wrap-left { display:flex; gap:4px; align-items:baseline; }
@@ -216,7 +217,7 @@
 }
 @media (hover:none) and (pointer:coarse) and (min-width:768px) and (max-width:1366px) and (min-height:600px) {
     .checklist-grid { grid-template-columns:none; grid-auto-flow:column; grid-auto-columns:100%; gap:12px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; padding-bottom:10px; align-items:start; }
-    .checklist-page { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; min-width:0; scroll-snap-align:start; align-items:stretch; }
+    .checklist-page { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:repeat(3,auto); gap:7px; min-width:0; scroll-snap-align:start; align-items:stretch; }
 }
 @media (max-width:767px),
        (min-width:768px) and (max-width:950px) and (max-height:520px) and (orientation:landscape) {
@@ -229,11 +230,11 @@
     .grp-title-main { font-size:13px; }
     .grp-title-actions { margin-left:auto; }
     .checklist-grid { grid-template-columns:none; grid-template-rows:none; grid-auto-flow:column; grid-auto-columns:100%; gap:8px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; padding-bottom:8px; align-items:start; }
-    .checklist-page { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; min-width:0; scroll-snap-align:start; align-items:stretch; }
+    .checklist-page { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:repeat(2,auto); gap:8px; min-width:0; scroll-snap-align:start; align-items:stretch; }
     .checklist-slot { min-height:116px; scroll-snap-align:none; }
     .d-detail-toolbar { padding:6px 12px 3px; }
     .d-detail-tab { min-height:36px; }
-    .d-reason-wrap,.d-recipe-wrap { padding:2px 12px 8px; }
+    .d-reason-wrap,.d-recipe-wrap { padding:8px 12px 10px; }
     .d-goal-recipe-wrap .uc-recipe-area { padding:9px 12px 10px; }
     .d-reason-tag { font-size:calc(11px * var(--fs-scale)); padding:4px 0; }
     .d-reason-tag.is-split-reason,.d-recipe-row { gap:7px; }
@@ -254,28 +255,4 @@
 }
 @media (prefers-reduced-motion:reduce) { .reset-btn-pending::after,.checklist-slot.is-material-ready { animation:none; } .d-material-ready { animation:none; background-position:50% 50%; } }
 
-/* 06. 카드 높이 동기화: subgrid 미지원 브라우저에서는 영역별 flex 행 통일 */
-@supports not (grid-template-rows:subgrid) {
-    @media (min-width:768px) and (min-height:521px) and (hover:hover) and (pointer:fine) {
-        .checklist-grid { grid-auto-rows:1fr; }
-    }
-}
-
-/* PC: 같은 줄의 이름 / 조건 / 상세 / 완료 영역을 공통 행에 정렬합니다.
-   조건이 없는 카드도 조건 행을 공유하며 상세 배경은 완료 영역까지 채웁니다. */
-@supports (grid-template-rows:subgrid) {
-    @media (min-width:768px) and (min-height:521px) and (hover:hover) and (pointer:fine) {
-        .checklist-slot.is-visible {
-            display:grid;
-            grid-row:span 4;
-            grid-template-rows:subgrid;
-            row-gap:0;
-        }
-        .checklist-slot > .d-slot-main { grid-row:1; }
-        .checklist-slot > .d-cond-inline { grid-row:2; }
-        .checklist-slot > .d-detail-wrap { grid-row:3; }
-        .checklist-slot > .d-goal-recipe-wrap { grid-row:2 / 4; }
-        .checklist-slot > .craft-wrap { grid-row:4; margin-top:0; }
-    }
-}
 

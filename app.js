@@ -1431,7 +1431,7 @@
         get updateBoardHeader() { return updateBoardHeader; },
         get updatePresetBtns() { return updatePresetBtns; }
     };
-    let completeGroup, returnChecklistControlsToHeader, renderChecklist, switchChecklistDetail, placeChecklistControls, scheduleChecklistCardHeights, updateChecklist;
+    let completeGroup, returnChecklistControlsToHeader, renderChecklist, switchChecklistDetail, placeChecklistControls, updateChecklist;
 
     /* ==========================================================================
        09. 체크리스트 재료 충족 판정
@@ -2235,7 +2235,6 @@
         const label = getEl('fontSizeLabel');
         if (label) label.innerText = `${Math.round(_fontScale * 100)}%`;
         try { localStorage.setItem(SYSTEM_CONFIG.storageKeys.fontScale, String(_fontScale)); } catch {}
-        scheduleChecklistCardHeights?.();
     }
 
     function loadFontScale() {
@@ -2344,7 +2343,6 @@
                 if (grp) {
                     if (grp.classList.contains('collapsed') || (gridEl && gridEl.style.display === 'none')) { grp.classList.remove('collapsed'); if (gridEl) gridEl.style.display = 'grid'; if (icon) icon.style.transform = 'rotate(0deg)'; }
                     else { grp.classList.add('collapsed'); if (gridEl) gridEl.style.display = 'none'; if (icon) icon.style.transform = 'rotate(-90deg)'; }
-                    scheduleChecklistCardHeights();
                 }
                 break;
             case 'addComplete': e.stopPropagation(); completeUnit(uid, parseInt(actionEl.dataset.batch || 1, 10)); break;
@@ -2404,7 +2402,7 @@
     /* ==========================================================================
        14. 앱 초기화
        ========================================================================== */
-    ({ completeGroup, completeUnit, placeChecklistControls, renderChecklist, resetGroupCompleted, returnChecklistControlsToHeader, scheduleChecklistCardHeights, switchChecklistDetail, updateChecklist } = window.NEXUS_CHECKLIST(checklistModuleContext));
+    ({ completeGroup, completeUnit, placeChecklistControls, renderChecklist, resetGroupCompleted, returnChecklistControlsToHeader, switchChecklistDetail, updateChecklist } = window.NEXUS_CHECKLIST(checklistModuleContext));
     ({ bindSwipeEvents, updatePivotColumns } = window.NEXUS_RESPONSIVE(checklistModuleContext));
 
     /* 부팅 상태 전달 */
