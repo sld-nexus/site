@@ -1460,6 +1460,7 @@
        ========================================================================== */
 
     const UNITBOARD_MOBILE_PAGING = window.matchMedia('(max-width:767px), (min-width:768px) and (max-width:950px) and (max-height:520px) and (orientation:landscape)');
+    const UNITBOARD_MOBILE_PAGE_SIZE = 2;
     const UNITBOARD_TABLET_PAGING = window.matchMedia('(hover:none) and (pointer:coarse) and (min-width:768px) and (max-width:1366px) and (min-height:600px)');
     const UNITBOARD_MIN_GRADE_INDEX = getGradeIndex(SYSTEM_CONFIG.search.minGradeForSearch || "레전드");
     const isUnitboardVisibleException = (id) => CLEAN_UNITBOARD_VISIBLE_EXCEPTION_IDS.has(clean(id));
@@ -1639,12 +1640,11 @@
     }
 
     /* ── 10-D · 분류·즐겨찾기 카드 페이지 생성 ── */
-    function buildPagerPages(htmlItems, pageSize, pageClass) {
+    function buildPagerPages(htmlItems, pageSize) {
         if (!Array.isArray(htmlItems) || htmlItems.length === 0) return '';
-        const size = Math.max(1, pageSize || htmlItems.length);
         let html = '';
-        for (let i = 0; i < htmlItems.length; i += size) {
-            html += `<div class="${pageClass}">${htmlItems.slice(i, i + size).join('')}</div>`;
+        for (let i = 0; i < htmlItems.length; i += pageSize) {
+            html += `<div class="unitboard-page">${htmlItems.slice(i, i + pageSize).join('')}</div>`;
         }
         return html;
     }
@@ -1669,8 +1669,8 @@
         if (items.length === 0) {
             return `<div class="collection-empty"><span aria-hidden="true">☆</span><h3>자주 쓰는 유닛을 모아두세요</h3><p>카드의 별을 누르면 여기에 모입니다.<br>원래 도감의 위치와 선택 상태는 그대로 유지됩니다.</p><button type="button" class="ctrl-btn" data-action="selectTab" data-tab-idx="${_activeTabIdx}">유닛도감 둘러보기</button></div>`;
         }
-        const pageSize = UNITBOARD_MOBILE_PAGING.matches ? 3 : UNITBOARD_TABLET_PAGING.matches ? 6 : 2;
-        return `<div class="unitboard-fav-grid">${buildPagerPages(items.map(item => buildCard(item, 'fav-')), pageSize, 'unitboard-page')}</div>`;
+        const pageSize = UNITBOARD_MOBILE_PAGING.matches ? UNITBOARD_MOBILE_PAGE_SIZE : UNITBOARD_TABLET_PAGING.matches ? 6 : 2;
+        return `<div class="unitboard-fav-grid">${buildPagerPages(items.map(item => buildCard(item, 'fav-')), pageSize)}</div>`;
     }
     function initAllTabContents() {
         const tc = getEl('tabContent');
@@ -1700,7 +1700,7 @@
                     items.splice(items.findIndex(unit => unit.id === '데하카고치'), 0, unit);
                 }
             }
-            const body = items.length ? buildPagerPages(items.map(item => buildCard(item)), UNITBOARD_MOBILE_PAGING.matches ? 3 : 6, 'unitboard-page') : '<div class="unitboard-empty-msg">표시할 유닛이 없습니다.</div>';
+            const body = items.length ? buildPagerPages(items.map(item => buildCard(item)), UNITBOARD_MOBILE_PAGING.matches ? UNITBOARD_MOBILE_PAGE_SIZE : 6) : '<div class="unitboard-empty-msg">표시할 유닛이 없습니다.</div>';
             group.innerHTML = `<div class="unitboard-category-grid">${body}</div>`;
         }
         group.dataset.rendered = '1';

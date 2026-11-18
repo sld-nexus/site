@@ -3,6 +3,8 @@ window.NEXUS_CHECKLIST = function createChecklist(ctx) {
     const { setHTMLIfChanged } = ctx;
 
     /* ── 01 · 카드·페이지 DOM 재사용 ── */
+    const CHECKLIST_MOBILE_PAGING = window.matchMedia('(max-width:767px), (min-width:768px) and (max-width:950px) and (max-height:520px) and (orientation:landscape)');
+    CHECKLIST_MOBILE_PAGING.addEventListener('change', () => updateChecklist());
 
     function reconcileChildren(parent, children) {
         let cursor = parent.firstElementChild;
@@ -14,7 +16,7 @@ window.NEXUS_CHECKLIST = function createChecklist(ctx) {
     }
 
     function updateGridPages(grid, items, onlyVisible) {
-        const pageSize = CHECKLIST_MOBILE_PAGING.matches ? 3 : 6;
+        const pageSize = CHECKLIST_MOBILE_PAGING.matches ? 2 : 6;
         const key = `${pageSize}|` + items.map(el => `${el.id}:${onlyVisible && el.style.display === 'none' ? 0 : 1}`).join('|');
         if (grid._pageKey === key) return;
         const shown = onlyVisible ? items.filter(el => el.style.display !== 'none') : items;
@@ -32,8 +34,6 @@ window.NEXUS_CHECKLIST = function createChecklist(ctx) {
     }
 
     /* ── 02 · 보드 생성·작업 버튼 배치 ── */
-    const CHECKLIST_MOBILE_PAGING = window.matchMedia('(max-width:767px), (min-width:768px) and (max-width:950px) and (max-height:520px) and (orientation:landscape)');
-    CHECKLIST_MOBILE_PAGING.addEventListener('change', () => updateChecklist());
 
     function renderChecklist() {
         if (ctx._isChecklistRendered) return;
