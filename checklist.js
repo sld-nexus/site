@@ -14,7 +14,7 @@ window.NEXUS_CHECKLIST = function createChecklist(ctx) {
     }
 
     function updateGridPages(grid, items, onlyVisible) {
-        const pageSize = CHECKLIST_MOBILE_PAGING.matches ? 2 : 6;
+        const pageSize = CHECKLIST_MOBILE_PAGING.matches ? 3 : 6;
         const key = `${pageSize}|` + items.map(el => `${el.id}:${onlyVisible && el.style.display === 'none' ? 0 : 1}`).join('|');
         if (grid._pageKey === key) return;
         const shown = onlyVisible ? items.filter(el => el.style.display !== 'none') : items;

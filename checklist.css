@@ -217,7 +217,7 @@
 }
 @media (hover:none) and (pointer:coarse) and (min-width:768px) and (max-width:1366px) and (min-height:600px) {
     .checklist-grid { grid-template-columns:none; grid-auto-flow:column; grid-auto-columns:100%; gap:12px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; padding-bottom:10px; align-items:start; }
-    .checklist-page { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:repeat(3,auto); gap:7px; min-width:0; scroll-snap-align:start; align-items:stretch; }
+    .checklist-page { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:repeat(3,auto); gap:7px; min-width:0; scroll-snap-align:start; align-items:stretch; align-content:start; }
 }
 @media (max-width:767px),
        (min-width:768px) and (max-width:950px) and (max-height:520px) and (orientation:landscape) {
@@ -229,11 +229,12 @@
     .checklist-group-title { flex-wrap:wrap; padding:0 0 10px; }
     .grp-title-main { font-size:13px; }
     .grp-title-actions { margin-left:auto; }
-    .checklist-grid { grid-template-columns:none; grid-template-rows:none; grid-auto-flow:column; grid-auto-columns:100%; gap:8px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; padding-bottom:8px; align-items:start; }
-    .checklist-page { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:repeat(2,auto); gap:8px; min-width:0; scroll-snap-align:start; align-items:stretch; }
+    .checklist-grid { grid-template-columns:none; grid-template-rows:repeat(3,auto); grid-auto-flow:column; grid-auto-columns:100%; gap:8px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; padding-bottom:8px; align-items:stretch; }
+    .checklist-page { display:contents; }
     .checklist-slot { min-height:116px; scroll-snap-align:none; }
+    .checklist-slot:nth-child(3n+1) { scroll-snap-align:start; }
     .d-detail-toolbar { padding:6px 12px 3px; }
-    .d-detail-tab { min-height:36px; }
+    .d-detail-tab { min-height:38px; }
     .d-reason-wrap,.d-recipe-wrap { padding:8px 12px 10px; }
     .d-goal-recipe-wrap .uc-recipe-area { padding:9px 12px 10px; }
     .d-reason-tag { font-size:calc(11px * var(--fs-scale)); padding:4px 0; }

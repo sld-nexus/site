@@ -36,10 +36,10 @@
         tabs: [
             { key: "테바", name: "테바" }, { key: "테메", name: "테메" },
             { key: "토바", name: "토바" }, { key: "토메", name: "토메" },
-            { key: "저그", name: "저그" }, { key: "중립", name: "중립" }, { key: "혼종", name: "혼종" }
+            { key: "저그중립", name: "저그중립" }, { key: "혼종", name: "혼종" }
         ],
         essence: {
-            mapping: { "테바": "코랄", "테메": "코랄", "토바": "아이어", "토메": "아이어", "저그": "제루스", "중립": "제루스", "혼종": "혼종" }
+            mapping: { "테바": "코랄", "테메": "코랄", "토바": "아이어", "토메": "아이어", "저그중립": "제루스", "혼종": "혼종" }
         },
         sorting: { order: { "아몬": 100, "나루드": 97 } },
         groupDefs: [
@@ -1669,8 +1669,8 @@
         if (items.length === 0) {
             return `<div class="collection-empty"><span aria-hidden="true">☆</span><h3>자주 쓰는 유닛을 모아두세요</h3><p>카드의 별을 누르면 여기에 모입니다.<br>원래 도감의 위치와 선택 상태는 그대로 유지됩니다.</p><button type="button" class="ctrl-btn" data-action="selectTab" data-tab-idx="${_activeTabIdx}">유닛도감 둘러보기</button></div>`;
         }
-        const pageSize = UNITBOARD_MOBILE_PAGING.matches ? 2 : UNITBOARD_TABLET_PAGING.matches ? 6 : 2;
-        return `<div class="unitboard-fav-grid">${buildPagerPages(items.map(item => buildCard(item, 'fav-')), pageSize, 'unitboard-page unitboard-fav-page')}</div>`;
+        const pageSize = UNITBOARD_MOBILE_PAGING.matches ? 3 : UNITBOARD_TABLET_PAGING.matches ? 6 : 2;
+        return `<div class="unitboard-fav-grid">${buildPagerPages(items.map(item => buildCard(item, 'fav-')), pageSize, 'unitboard-page')}</div>`;
     }
     function initAllTabContents() {
         const tc = getEl('tabContent');
@@ -1693,14 +1693,14 @@
         if (key === 'favorites') group.innerHTML = buildUnitboardCollection(key);
         else {
             const items = getUnitboardVisibleItems().filter(unit => unit.category === key).sort(getUnitboardSort);
-            if (key === '저그') {
+            if (key === '저그중립') {
                 const arm = items.findIndex(unit => unit.id === '데하카의오른팔');
                 if (arm >= 0 && items.some(unit => unit.id === '데하카고치')) {
                     const [unit] = items.splice(arm, 1);
                     items.splice(items.findIndex(unit => unit.id === '데하카고치'), 0, unit);
                 }
             }
-            const body = items.length ? buildPagerPages(items.map(item => buildCard(item)), UNITBOARD_MOBILE_PAGING.matches ? 2 : 6, 'unitboard-page unitboard-category-page') : '<div class="unitboard-empty-msg">표시할 유닛이 없습니다.</div>';
+            const body = items.length ? buildPagerPages(items.map(item => buildCard(item)), UNITBOARD_MOBILE_PAGING.matches ? 3 : 6, 'unitboard-page') : '<div class="unitboard-empty-msg">표시할 유닛이 없습니다.</div>';
             group.innerHTML = `<div class="unitboard-category-grid">${body}</div>`;
         }
         group.dataset.rendered = '1';
