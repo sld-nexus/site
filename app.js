@@ -136,10 +136,7 @@
             : slot
     );
     const COSTBOARD_DISPLAY_ATOMS = COSTBOARD_DISPLAY_SLOT_DEFS.flatMap(slot => slot.atoms);
-    // 전체재료 전환 전용 상위 유닛. 데이터베이스의 실제 이름과 계산 ID를 유지한다.
-    const EXPANDED_MATERIAL_EXTRA_ATOMS = Object.freeze(['노바', '히페리온', '보라준', '공허의 구도자', '거대 괴수']);
-    const EXPANDED_MATERIAL_EXTRA_RAW_MAP = Object.fromEntries(EXPANDED_MATERIAL_EXTRA_ATOMS.map(atom => [clean(atom), atom]));
-    const MATERIAL_ALL_ATOMS = Object.freeze([...SYSTEM_CONFIG.costboardAtoms, VOID_RAY_ATOM, ...LEGACY_COMPLETION_ATOMS, ...EXPANDED_MATERIAL_EXTRA_ATOMS]);
+    const MATERIAL_ALL_ATOMS = Object.freeze([...SYSTEM_CONFIG.costboardAtoms, VOID_RAY_ATOM, ...LEGACY_COMPLETION_ATOMS]);
     const EXPANDED_MATERIAL_BOTTOM_IDS = new Set([VOID_RAY_ATOM, '땅거미지뢰', '자동포탑', '우르사돈수', '우르사돈암'].map(clean));
     const GROUP_DEFS = SYSTEM_CONFIG.groupDefs;
     const titleToGridId = Object.fromEntries(GROUP_DEFS.map(g => [g.title, g.pid]));
@@ -1186,16 +1183,14 @@
        07. 필요 재료·원가 계산
        ========================================================================== */
 
-    const getCostboardAtomRawName = (uid) => ATOM_HASH[uid] || LEGACY_COMPLETION_RAW_MAP[uid] || AUTO_COST_RAW_MAP[uid] || EXPANDED_MATERIAL_EXTRA_RAW_MAP[uid] || uid;
-    const getCostboardDisplayName = (atom) => clean(atom) === VOID_RAY_ID ? '공허포격기'
-        : EXPANDED_MATERIAL_EXTRA_ATOMS.some(name => clean(name) === clean(atom)) ? String(atom).replace(/\s+/g, '') : atom;
+    const getCostboardAtomRawName = (uid) => ATOM_HASH[uid] || LEGACY_COMPLETION_RAW_MAP[uid] || AUTO_COST_RAW_MAP[uid] || uid;
+    const getCostboardDisplayName = (atom) => clean(atom) === VOID_RAY_ID ? '공허포격기' : atom;
     const getExpandedCostboardSlots = () => {
         const regular = [], bottom = [];
         for (const slot of COSTBOARD_DISPLAY_SLOT_DEFS) {
             (slot.atoms.some(atom => EXPANDED_MATERIAL_BOTTOM_IDS.has(clean(atom))) ? bottom : regular).push(slot);
         }
-        return [...regular, ...LEGACY_COMPLETION_ATOMS.map(atom => ({ atoms: [atom] })),
-            ...EXPANDED_MATERIAL_EXTRA_ATOMS.map(atom => ({ atoms: [atom] })), ...bottom];
+        return [...regular, ...LEGACY_COMPLETION_ATOMS.map(atom => ({ atoms: [atom] })), ...bottom];
     };
     const getCostboardSlotToneClass = (atoms) => atoms.some(atom => AUTO_COST_SLOT_SET.has(clean(atom))) ? 'is-skill-slot' : 'is-magic-slot';
     function renderBoardSlots(boardId, atoms, slotTemplate) {
@@ -1295,7 +1290,7 @@
             { activeSource, preferRecipeAtoms: true });
         const stock = new Map(SYSTEM_CONFIG.costboardAtoms.map(atom =>
             [clean(atom), Math.max(0, completedUnits.get(clean(atom)) || 0)]));
-        for (const atom of [VOID_RAY_ATOM, ...LEGACY_COMPLETION_ATOMS, ...EXPANDED_MATERIAL_EXTRA_ATOMS]) {
+        for (const atom of [VOID_RAY_ATOM, ...LEGACY_COMPLETION_ATOMS]) {
             const needed = Math.max(0, (totals.targetMap[atom] || 0) - (totals.completedMap[atom] || 0));
             if (!needed) continue;
             const recipe = getExpandedCoreRecipe(atom);
